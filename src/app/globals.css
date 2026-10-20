@@ -1,8 +1,8 @@
 @import "tailwindcss";
-@theme inline { --color-primary: #087f67; --color-background: #f5f7f9; --color-foreground: #172b3a; --font-sans: "Inter", Arial, Helvetica, sans-serif; }
+@theme inline { --color-primary: #087f67; --color-background: #f5f7f9; --color-foreground: #172b3a; --font-sans: "Inter Variable", Arial, Helvetica, sans-serif; }
 :root { --primary:#087f67; --primary-light:#e8f5ef; --border:#e4e9ed; --muted:#647582; --background:#f5f7f9; }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--background); color:#172b3a; font-family:"Inter",Arial,Helvetica,sans-serif; font-size:14px; -webkit-font-smoothing:antialiased; }
+body { margin:0; background:var(--background); color:#172b3a; font-family:"Inter Variable",Arial,Helvetica,sans-serif; font-size:14px; -webkit-font-smoothing:antialiased; }
 a { text-decoration:none; color:inherit; } button,input,select,textarea { font:inherit; } button,a,input,select,textarea { -webkit-tap-highlight-color:transparent; } button { cursor:pointer; } button:disabled { cursor:wait; opacity:.6; }
 :focus-visible { outline:3px solid #118b72; outline-offset:3px; }
 .skip-link { position:fixed; top:-100px; left:20px; padding:14px; background:white; z-index:100; } .skip-link:focus { top:10px; }
