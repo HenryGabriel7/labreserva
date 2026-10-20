@@ -41,3 +41,9 @@
 - Verificado: lint, typecheck e Vitest passaram localmente.
 - Pendente: testes Supabase/pgTAP e integração exigem Docker + serviços e credenciais; executar conforme README. Não foram considerados aprovados.
 - Próximo passo: Painel do monitor e ocorrências.
+
+## Etapa 6 — Painel do monitor e ocorrências
+- Feito: implementação da etapa incluída neste commit.
+- Verificado: lint, typecheck e Vitest passaram localmente.
+- Pendente: testes Supabase/pgTAP e integração exigem Docker + serviços e credenciais; executar conforme README. Não foram considerados aprovados.
+- Próximo passo: Recorrência.
