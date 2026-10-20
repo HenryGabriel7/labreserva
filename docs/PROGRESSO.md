@@ -23,3 +23,9 @@
 - Verificado: lint, typecheck e Vitest passaram localmente.
 - Pendente: testes Supabase/pgTAP e integração exigem Docker + serviços e credenciais; executar conforme README. Não foram considerados aprovados.
 - Próximo passo: Auth, RBAC e contas.
+
+## Etapa 3 — Auth, RBAC e contas
+- Feito: implementação da etapa incluída neste commit.
+- Verificado: lint, typecheck e Vitest passaram localmente.
+- Pendente: testes Supabase/pgTAP e integração exigem Docker + serviços e credenciais; executar conforme README. Não foram considerados aprovados.
+- Próximo passo: Cadastros e configurações.
