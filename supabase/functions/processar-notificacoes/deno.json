@@ -1,0 +1,20 @@
+{
+  "imports": {
+    "react": "npm:react@19.3.1",
+    "@types/react": "npm:@types/react@19.3.0",
+    "react/jsx-runtime": "npm:react@19.3.1/jsx-runtime",
+    "react-dom": "npm:react-dom@19.3.1",
+    "@react-email/components": "npm:@react-email/components@1.0.12",
+    "@react-email/render": "npm:@react-email/render@2.1.1",
+    "resend": "npm:resend@6.34.1",
+    "zod": "npm:zod@4.6.7",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.118.0"
+  },
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "jsxImportSourceTypes": "npm:@types/react@19.3.0",
+    "strict": true
+  },
+  "nodeModulesDir": "auto"
+}
