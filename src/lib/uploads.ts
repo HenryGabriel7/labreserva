@@ -1,5 +1,65 @@
 import { fileTypeFromBuffer } from "file-type";
+import { z } from "@/lib/validacao";
 export const MAX_FOTO_BYTES = 5 * 1024 * 1024;
+export const BUCKET_FOTOS_TEMPORARIAS = "ocorrencias-temporarias";
+export const MAX_JSON_OCORRENCIA_BYTES = 16 * 1024;
+export const fotosPreparacaoSchema = z
+  .object({
+    reservaId: z.uuid(),
+    fotos: z
+      .array(
+        z
+          .object({
+            tamanho: z.number().int().min(1).max(MAX_FOTO_BYTES),
+            mime: z.enum(["image/jpeg", "image/png", "image/webp"]),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+export const ocorrenciaEntradaSchema = z
+  .object({
+    reservaId: z.uuid(),
+    tipo: z.enum(["dano", "falta_material", "uso_indevido"]),
+    gravidade: z.enum(["baixa", "media", "grave"]),
+    descricao: z.string().trim().min(5).max(4000),
+    loteId: z.uuid().nullable(),
+  })
+  .strict();
+
+export async function lerJsonOcorrencia(request: Request) {
+  if (
+    request.headers.get("content-type")?.split(";")[0].trim() !==
+    "application/json"
+  )
+    throw new Error("Use JSON.");
+  return JSON.parse(
+    new TextDecoder().decode(
+      await lerCorpoLimitado(request, MAX_JSON_OCORRENCIA_BYTES),
+    ),
+  ) as unknown;
+}
+
+export function validarPathsTemporarios(
+  paths: unknown,
+  usuarioId: string,
+  loteId: string,
+): string[] {
+  const resultado = z.array(z.string()).min(1).max(5).parse(paths);
+  const prefixo = `${usuarioId}/${loteId}/`;
+  if (
+    new Set(resultado).size !== resultado.length ||
+    resultado.some(
+      (path) =>
+        !path.startsWith(prefixo) ||
+        !z.uuid().safeParse(path.slice(prefixo.length)).success,
+    )
+  )
+    throw new Error("Lote inválido.");
+  return resultado;
+}
 export async function identificarFoto(bytes: Uint8Array) {
   if (!bytes.length || bytes.length > MAX_FOTO_BYTES)
     throw new Error("Cada foto deve ter até 5 MB.");

@@ -33,9 +33,48 @@ export function OcorrenciaForm({
         }
         startTransition(async () => {
           try {
+            let loteId: string | null = null;
+            if (fotos.length) {
+              const preparo = await fetch("/api/ocorrencias/uploads", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  reservaId: dados.get("reservaId"),
+                  fotos: fotos.map((foto) => ({
+                    tamanho: foto.size,
+                    mime: foto.type,
+                  })),
+                }),
+              });
+              const lote = await preparo.json();
+              if (!preparo.ok) {
+                setMensagem(
+                  lote.mensagem ?? "Não foi possível preparar as fotos.",
+                );
+                return;
+              }
+              loteId = lote.loteId;
+              // Os bytes vão ao bucket privado de quarentena, sem passar pela
+              // função Vercel. O servidor ainda confere o conteúdo antes de usar.
+              for (const [i, foto] of fotos.entries()) {
+                const envio = await fetch(lote.uploads[i], {
+                  method: "PUT",
+                  headers: { "Content-Type": foto.type, "x-upsert": "false" },
+                  body: foto,
+                });
+                if (!envio.ok) throw new Error("Falha ao enviar foto");
+              }
+            }
             const res = await fetch("/api/ocorrencias", {
               method: "POST",
-              body: dados,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                reservaId: dados.get("reservaId"),
+                tipo: dados.get("tipo"),
+                gravidade: dados.get("gravidade"),
+                descricao: dados.get("descricao"),
+                loteId,
+              }),
             });
             const body = await res.json();
             setMensagem(body.mensagem ?? "Falha ao registrar.");

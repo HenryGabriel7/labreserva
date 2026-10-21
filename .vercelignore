@@ -1,0 +1,11 @@
+.env*
+**/.env*
+.git/
+.vercel/
+.next/
+**/node_modules/
+test-results/
+playwright-report/
+coverage/
+supabase/.temp/
+supabase/.branches/

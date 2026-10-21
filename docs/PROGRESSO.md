@@ -5,7 +5,12 @@
 - Repositório publicado em `HenryGabriel7/labreserva`, branch `main`.
 - A primeira execução remota do GitHub Actions (`39661076622`) aprovou lint, tipos, 64 testes unitários, worker Deno e **204 asserções pgTAP nativas no Supabase local do runner**. Essa evidência atualiza a pendência histórica de pgTAP abaixo.
 - A integração teve um teste aprovado e quatro falhas por `Email logins are disabled`. Corrigido o provider de e-mail local: `[auth.email].enable_signup=true` habilita o login, enquanto `[auth].enable_signup=false` continua bloqueando o cadastro público. O teste HTTP confere os dois flags antes de testar o bloqueio de signup. A repetição do CI ainda é necessária.
-- Supabase conectado à organização `HenryGabriel7`; criação do projeto aguarda a escolha explícita da organização. A Vercel ainda não possui autenticação válida neste ambiente. Nenhum banco hospedado ou deploy foi criado nesta preparação.
+- Projeto Supabase `hvcetcfairwfuyxlyynl` (`labreserva`) criado em `sa-east-1`, na organização `HenryGabriel7`. Aplicadas as oito migrações, sem seed de desenvolvimento: 18 tabelas públicas com RLS, dois buckets privados e dois jobs. Histórico alinhado às versões dos arquivos do repositório.
+- Auth hospedado configurado para login por e-mail, cadastro público bloqueado, senha de 12 caracteres com complexidade e redirects somente em `https://labreserva.vercel.app`. O diff do CLI confirmou ausência de mudanças pendentes nos campos declarados.
+- Projeto Vercel `labreserva` criado e conectado ao GitHub; domínio atribuído `labreserva.vercel.app`, Node 24 e cinco variáveis de produção cadastradas. Publicação e verificação HTTP em andamento.
+- Corrigido o envio de fotos para usar Storage assinado e quarentena privada. As funções Vercel recebem JSON de até 16 KiB. Passaram lint, tipos, build, 79 testes unitários e 216 asserções SQL WASM.
+- Após o ajuste de Auth, o CI `39663394086` aprovou 204 pgTAP nativos, cinco integrações reais, build, audit e 46 testes de demonstração. Os quatro E2E autenticados apontaram seletores de formulário e HTTP local incompatível com a guarda HTTPS de produção; a correção do ambiente de QA está em andamento.
+- Resend ainda não configurado pelo proprietário. Convites e e-mails automáticos não foram enviados; nenhuma entrega foi afirmada como concluída.
 
 ---
 
@@ -34,10 +39,10 @@ Lint, typecheck e Vitest passaram em todos os checkpoints. A implementação inc
 | Verificação                      | Resultado                                                                                  |
 | -------------------------------- | ------------------------------------------------------------------------------------------ |
 | ESLint e TypeScript strict       | Aprovados; repetidos nos checkpoints finais                                                |
-| Vitest                           | 64 testes aprovados em 13 arquivos                                                         |
+| Vitest                           | 79 testes aprovados em 14 arquivos                                                         |
 | Build Next.js de produção        | Aprovado                                                                                   |
 | Auditoria npm                    | 0 vulnerabilidades                                                                         |
-| SQL/RLS/RPC no PostgreSQL WASM   | 204 asserções aprovadas                                                                    |
+| SQL/RLS/RPC no PostgreSQL WASM   | 216 asserções aprovadas                                                                    |
 | Worker Deno                      | Tipos aprovados; 1 teste com 4 passos aprovado, sem rede                                   |
 | Chromium sobre build de produção | 46 casos aprovados: desktop 1440 × 1000 e celular 360 × 800                                |
 | Axe e largura da interface       | 20 rotas nos dois tamanhos, sem violações nas regras verificadas e sem overflow horizontal |
