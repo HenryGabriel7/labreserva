@@ -59,3 +59,9 @@
 - Verificado: lint, typecheck e Vitest passaram localmente.
 - Pendente: testes Supabase/pgTAP e integração exigem Docker + serviços e credenciais; executar conforme README. Não foram considerados aprovados.
 - Próximo passo: Relatórios e auditoria.
+
+## Etapa 9 — Relatórios e auditoria
+- Feito: implementação da etapa incluída neste commit.
+- Verificado: lint, typecheck e Vitest passaram localmente.
+- Pendente: testes Supabase/pgTAP e integração exigem Docker + serviços e credenciais; executar conforme README. Não foram considerados aprovados.
+- Próximo passo: Hardening e acessibilidade.

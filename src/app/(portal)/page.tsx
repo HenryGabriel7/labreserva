@@ -3,18 +3,19 @@ import { CalendarDays, ArrowUpRight, ArrowRight, Plus, Clock3, FlaskConical, Use
 import { getContexto,getLaboratorios,getReservas } from "@/lib/data";
 import { PageHeading,LabIcon,StatusBadge,dataBr,EmptyState } from "@/components/shared";
 import { nomeTipo } from "@/lib/types";
+import { getResumoPainel } from "@/lib/data-painel";
 import "./dashboard.css";
 
 export default async function Dashboard(){
-  const [{usuario,demonstracao},labs,{reservas}]=await Promise.all([getContexto(),getLaboratorios(),getReservas()]);
+  const [{usuario,demonstracao},labs,{reservas},resumo]=await Promise.all([getContexto(),getLaboratorios(),getReservas(),getResumoPainel()]);
   const gestor=demonstracao||usuario?.roles.some(r=>["admin","monitor"].includes(r));
   const hoje=dataBr(new Date().toISOString(),"yyyy-MM-dd");
   const reservasHoje=reservas.filter(r=>dataBr(r.inicio,"yyyy-MM-dd")===hoje);
-  const pendentes=reservas.filter(r=>r.status==="pendente").length;
+  const pendentes=resumo?.pendentes??reservas.filter(r=>r.status==="pendente").length;
   const aprovadas=reservas.filter(r=>["aprovada","em_uso","concluida"].includes(r.status));
-  const ocupacao=labs.length?Math.round(new Set(reservasHoje.filter(r=>r.status==="em_uso").map(r=>r.laboratorio_id)).size/labs.length*100):0;
+  const ocupacao=resumo?.ocupacaoPercentual??(labs.length?Math.round(new Set(reservasHoje.filter(r=>r.status==="em_uso").map(r=>r.laboratorio_id)).size/labs.length*100):0);
   const proximas=reservas.filter(r=>["aprovada","em_uso"].includes(r.status)).sort((a,b)=>a.inicio.localeCompare(b.inicio)).slice(0,3);
-  const metrics=[{label:"Laboratórios ativos",value:labs.filter(l=>l.ativo).length,icon:FlaskConical,note:"Espaços prontos para aprender",cor:"green"},{label:"Reservas hoje",value:reservasHoje.length,icon:CalendarDays,note:`${aprovadas.filter(r=>dataBr(r.inicio,"yyyy-MM-dd")===hoje).length} confirmadas para hoje`,cor:"blue"},{label:"Aguardando aprovação",value:pendentes,icon:Clock3,note:"Solicitações para analisar",cor:"amber"},{label:"Ocupação neste momento",value:`${ocupacao}%`,icon:UsersRound,note:"Dos laboratórios disponíveis",cor:"purple"}];
+  const metrics=[{label:"Laboratórios ativos",value:resumo?.labsAtivos??labs.filter(l=>l.ativo).length,icon:FlaskConical,note:"Espaços prontos para aprender",cor:"green"},{label:"Reservas hoje",value:resumo?.reservasHoje??reservasHoje.length,icon:CalendarDays,note:`${resumo?.confirmadasHoje??aprovadas.filter(r=>dataBr(r.inicio,"yyyy-MM-dd")===hoje).length} confirmadas para hoje`,cor:"blue"},{label:"Aguardando aprovação",value:pendentes,icon:Clock3,note:"Solicitações para analisar",cor:"amber"},{label:"Ocupação neste momento",value:`${ocupacao}%`,icon:UsersRound,note:"Dos laboratórios disponíveis",cor:"purple"}];
   const dataExtensa=new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo",weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(new Date());
   return <>
     <PageHeading titulo={usuario?`Olá, ${usuario.nome.split(" ")[0]}. Bom ter você por aqui!`:"Visão geral"} descricao="Acompanhe os espaços, organize as reservas e faça o conhecimento acontecer." acao={<><Link href="/calendario" className="button button-outline"><CalendarDays size={15}/>Ver calendário</Link><Link href="/reservas/nova" className="button button-primary"><Plus size={16}/>Nova reserva</Link></>}/>
