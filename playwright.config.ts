@@ -2,10 +2,13 @@ import { defineConfig, devices } from "@playwright/test";
 import { ambienteLocal } from "./tests/integration/helpers";
 
 const demoURL = "http://127.0.0.1:3101";
-const liveURL = "http://127.0.0.1:3100";
+const liveURL = "https://127.0.0.1:3100";
 const servidor = (porta: number, demonstracao: boolean) => ({
-  command: `node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port ${porta}`,
+  command: demonstracao
+    ? `node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port ${porta}`
+    : "node scripts/servidor-e2e-https.mjs",
   url: demonstracao ? demoURL : liveURL,
+  ignoreHTTPSErrors: !demonstracao,
   timeout: 120000,
   reuseExistingServer: false,
   env: {
@@ -62,7 +65,12 @@ export default defineConfig({
     {
       name: "supabase-local",
       testMatch: "supabase.spec.ts",
-      use: { ...devices["Desktop Chrome"], baseURL: liveURL, trace: "off" },
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: liveURL,
+        trace: "off",
+        ignoreHTTPSErrors: true,
+      },
     },
   ],
   webServer: [

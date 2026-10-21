@@ -19,7 +19,7 @@ import {
   senhaDev,
 } from "../integration/helpers";
 
-const liveURL = "http://127.0.0.1:3100";
+const liveURL = "https://127.0.0.1:3100";
 let pessoas: {
   aluno: Awaited<ReturnType<typeof criarPessoa>>;
   professor: Awaited<ReturnType<typeof criarPessoa>>;
@@ -33,6 +33,7 @@ async function novaPagina(browser: Browser) {
     baseURL: liveURL,
     locale: "pt-BR",
     timezoneId: "America/Sao_Paulo",
+    ignoreHTTPSErrors: true,
   });
   contextos.push(contexto);
   return contexto.newPage();
@@ -51,7 +52,7 @@ async function solicitarNaTela(
 ) {
   await page.goto(`/reservas/nova?lab=${laboratorioId}`);
   await page
-    .getByLabel("Laboratório", { exact: true })
+    .getByRole("combobox", { name: "Laboratório", exact: true })
     .selectOption(laboratorioId);
   await page.getByLabel("Data", { exact: true }).fill(horarioFuturo().data);
   await page.getByLabel("Horário de início", { exact: true }).fill("14:00");
@@ -167,7 +168,10 @@ test.describe("fluxos reais Supabase local", () => {
         "Atividade curricular prioritária, substituição validada pelo monitor.",
       );
     await pedido
-      .getByLabel("Reserva aprovada a substituir")
+      .getByRole("combobox", {
+        name: "Reserva aprovada a substituir",
+        exact: true,
+      })
       .selectOption(antiga);
     await pedido.getByRole("button", { name: "Substituir com motivo" }).click();
     await expect.poll(() => status(antiga)).toBe("substituida");

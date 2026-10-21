@@ -18,7 +18,7 @@ const valores = {
   SUPABASE_URL: ambiente.API_URL,
   SUPABASE_PUBLISHABLE_KEY: ambiente.PUBLISHABLE_KEY ?? ambiente.ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: ambiente.SERVICE_ROLE_KEY,
-  APP_URL: "http://127.0.0.1:3100",
+  APP_URL: "https://127.0.0.1:3100",
   REQUIRE_SUPABASE_TESTS: "true",
 };
 if (

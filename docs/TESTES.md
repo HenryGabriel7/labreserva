@@ -27,7 +27,7 @@ npx playwright install chromium
 npm run test:e2e -- --project=demo-desktop --project=demo-mobile-360
 ```
 
-Playwright inicia `next start` em `127.0.0.1:3101`, usando o build de produção, com as variáveis Supabase explicitamente vazias. Não reutiliza um servidor desconhecido. As portas 3100 e 3101 evitam conflito com o desenvolvimento em 3000; mantenha 3101 livre. O servidor é encerrado ao final dos testes.
+Playwright inicia `next start` em `127.0.0.1:3101`, usando o build de produção, com as variáveis Supabase explicitamente vazias. Não reutiliza um servidor desconhecido. Mantenha as portas 3100, 3101 e 3102 livres; o desenvolvimento usa 3000. Os servidores são encerrados ao final dos testes.
 
 A demonstração possui 46 casos: 20 rotas com axe e verificação de overflow em cada viewport, mais três fluxos funcionais por viewport. São testados o painel, catálogo, detalhe e gestão de laboratórios, calendário, reservas e formulário, monitor, usuários, perfil, notificações, bloqueios, configurações, ocorrências, relatórios e privacidade dos relatórios, auditoria, ajuda, privacidade e login. A navegação também verifica o filtro do catálogo, as visões semanal/mensal e a validação de campos obrigatórios. Os tamanhos usados são 1440 × 1000 e 360 × 800 pixels.
 
@@ -42,13 +42,15 @@ npm run test:db
 npx supabase status --output json
 ```
 
-Transfira os valores locais `API_URL`, `ANON_KEY` (ou `PUBLISHABLE_KEY`) e `SERVICE_ROLE_KEY` para as variáveis de ambiente `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. Não cole o JSON de status em logs públicos. Defina também `APP_URL=http://127.0.0.1:3100` e execute:
+Transfira os valores locais `API_URL`, `ANON_KEY` (ou `PUBLISHABLE_KEY`) e `SERVICE_ROLE_KEY` para as variáveis de ambiente `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. Não cole o JSON de status em logs públicos. Defina também `APP_URL=https://127.0.0.1:3100` e execute:
 
 ```sh
 npm run test:integration
 npm run build
 npm run test:e2e
 ```
+
+Os fluxos autenticados usam HTTPS local: `scripts/servidor-e2e-https.mjs` gera um certificado de um dia em uma pasta temporária com OpenSSL, atende somente `127.0.0.1:3100` e encaminha para o Next de produção em `127.0.0.1:3102`. O proxy preserva o Origin HTTPS e fixa Host/X-Forwarded-Proto; não registra requisições nem credenciais. O certificado e a chave são descartados ao encerrar normalmente. O runner Ubuntu já oferece OpenSSL; no Windows, o script procura também os binários incluídos no Git. Somente o projeto `supabase-local`, seus contextos de navegador e a verificação de prontidão desse servidor ignoram a confiança do certificado local. A aplicação mantém a exigência de HTTPS para convites em produção, sem exceção para QA.
 
 Os testes criam usuários, papéis, laboratórios e janelas com identificadores aleatórios, exclusivamente no banco local. Usam a senha de desenvolvimento do seed, `DevOnly!123456`. Os solicitantes, professores e monitores são distintos; os monitores possuem vínculo explícito com o laboratório. Solicitações, decisões, substituição, cancelamento, check-in e check-out passam pelos formulários e Server Actions reais. O teste de convite usa a UI administrativa, lê o link na fila com service_role local e abre `/auth/confirm`; não chama o Resend nem o SMTP.
 

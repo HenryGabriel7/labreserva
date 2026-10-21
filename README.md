@@ -109,7 +109,7 @@ npx playwright install chromium
 npm run test:e2e -- --project=demo-desktop --project=demo-mobile-360
 ```
 
-QA usa `3101` para demonstração e `3100` para Supabase. Para os fluxos reais, exporte as três variáveis Supabase locais e `APP_URL=http://127.0.0.1:3100` no shell; execute `npm run test:db`, `npm run test:integration` e `npm run test:e2e`.
+QA usa HTTP em `3101` para demonstração e HTTPS em `3100` para Supabase. Para os fluxos reais, exporte as três variáveis Supabase locais e `APP_URL=https://127.0.0.1:3100` no shell; execute `npm run test:db`, `npm run test:integration` e `npm run test:e2e`. O proxy exclusivo de testes gera um certificado temporário com OpenSSL e encaminha para o Next de produção em `127.0.0.1:3102`. No Windows, o script também procura o OpenSSL incluído no Git. Mantenha as três portas livres; a aplicação continua exigindo HTTPS para convites em produção.
 
 Os testes com service_role recusam hosts remotos. Sem Supabase, casos autenticados aparecem como **skipped**, não como aprovados; no CI, ausência de serviços é erro. O harness WASM usa adaptadores declarados de Auth, Storage, Vault, cron/net e TAP: exercita SQL e RLS, mas não substitui GoTrue, PostgREST, pgTAP nativo nem concorrência multiconexão. Veja [TESTES](docs/TESTES.md), [PROGRESSO](docs/PROGRESSO.md) e [EMAIL](docs/EMAIL.md) para evidências, worker Deno e validação de entrega.
 
