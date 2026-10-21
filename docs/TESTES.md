@@ -56,6 +56,8 @@ Para comprovar check-in sem esperar dois dias, uma fixture de testes desloca **s
 
 A concorrência usa oito reservas pendentes no mesmo laboratório e intervalo, aprovadas com oito requisições HTTP simultâneas. Confere tanto os sete erros quanto exatamente uma linha aprovada no banco. A revogação copia o access token retornado por `signInWithPassword`, executa logout global e tenta leitura/RPC diretamente no PostgREST com esse token antigo, sem depender do proxy Next.
 
+O teste de cadastro consulta também `/auth/v1/settings` e exige `external.email=true` com `disable_signup=true`. Assim, a recusa de signup não é aceita como prova quando o provider inteiro está desligado. O teste unitário de tooling preserva essa combinação no `config.toml`.
+
 ## CI
 
 O workflow executa lint, tipos, unidade, check/test Deno, Supabase/Docker, reset, pgTAP real, integração, build, audit e E2E. O Deno 2.9.6 é executado pelo pacote npm, com os mesmos comandos documentados em `EMAIL.md`; o teste não recebe permissão de rede. `scripts/ci-env.mjs` lê o status local e grava as chaves no ambiente do job sem imprimir seus valores. O runner não recebe chave de Resend; a fila não realiza entregas externas. Chromium é instalado com as dependências do sistema. Falhas de axe são reportadas com regra, seletor e contraste; nenhuma regra é suprimida.
@@ -69,3 +71,4 @@ Os relatórios de navegador incluem somente o ambiente local de QA e ficam como 
 - Verificações estáticas e testes de unidade/SQL embutido constam também em `PROGRESSO.md`.
 - A execução de integração marcou os **cinco testes como skipped**, explicitamente pela ausência do Supabase local. Os **quatro casos E2E autenticados** permanecem não executados neste computador.
 - Supabase real, pgTAP nativo, concorrência HTTP, revogação no GoTrue/PostgREST, cron e entrega de e-mail não foram validados neste computador sem Docker/Supabase local. As camadas de banco, integração e E2E autenticado permanecem obrigatórias no CI; entrega real de e-mail exige a configuração descrita em `EMAIL.md`.
+- Na primeira [execução remota do CI](https://github.com/HenryGabriel7/labreserva/actions/runs/39661076622), as 204 asserções pgTAP passaram no Supabase real do runner. A integração teve um teste aprovado e quatro falhas com `Email logins are disabled`, interrompendo as etapas posteriores. A configuração do provider Email foi corrigida; o resultado da nova execução deve ser conferido antes do deploy.

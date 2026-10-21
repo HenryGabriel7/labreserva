@@ -4,6 +4,7 @@ import {
   ambienteLocal,
   clientePublico,
   clienteServico,
+  configuracaoLocal,
   criarLaboratorio,
   criarPessoa,
   exigirSucesso,
@@ -58,6 +59,18 @@ describe.skipIf(!ambienteLocal)(
     });
 
     it("signUp direto com chave pública é recusado pelo Auth", async () => {
+      const local = configuracaoLocal();
+      if (!local) throw new Error(motivoSemSupabase);
+      const settings = await fetch(new URL("/auth/v1/settings", local.url), {
+        headers: { apikey: local.chavePublica },
+      });
+      expect(settings.ok).toBe(true);
+      const configuracao = (await settings.json()) as {
+        external: { email: boolean };
+        disable_signup: boolean;
+      };
+      expect(configuracao.external.email).toBe(true);
+      expect(configuracao.disable_signup).toBe(true);
       const resposta = await clientePublico().auth.signUp({
         email: `publico-${randomUUID()}@teste.edu.br`,
         password: "DevOnly!123456",

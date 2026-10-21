@@ -2,7 +2,7 @@
 
 ## Provisionamento obrigatório
 
-- Supabase Auth: desabilitar novos cadastros (`enable_signup=false` em config.toml; painel Authentication → configuração de signups). Confirmar que POST /auth/v1/signup com chave pública falha pelo teste de integração.
+- Supabase Auth: manter o provider Email habilitado e desabilitar novos cadastros. Localmente, usar `[auth] enable_signup=false` junto de `[auth.email] enable_signup=true`. Na Management API hospedada, usar `disable_signup=true` e `external_email_enabled=true`. O nome da opção da seção `auth.email` é enganoso: ela controla o provider, inclusive o login por senha, conforme o [mapeamento oficial do CLI](https://github.com/supabase/cli/blob/v2.121.0/apps/cli-go/pkg/config/auth.go). Confirmar no teste de integração que o provider continua ativo e POST /auth/v1/signup com chave pública falha.
 - Senhas: mínimo 12 caracteres, requisitos lower/upper/digits/symbols no Supabase Auth (painel e configuração local). Ativar proteção de senhas vazadas quando disponível no plano. A validação do formulário é complementar.
 - URL de produção HTTPS em APP_URL e redirect allowlist restrita. Cookies Secure em produção, SameSite=Lax; não forçar HttpOnly no cliente SSR Supabase.
 - Não há cadastro público nem envio pelo SMTP padrão. Apenas admin autenticado cria convites; recuperação tem resposta indistinta.

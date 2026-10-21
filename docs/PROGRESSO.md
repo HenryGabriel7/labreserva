@@ -1,5 +1,14 @@
 # Progresso
 
+## Preparação de produção — 21/10/2026
+
+- Repositório publicado em `HenryGabriel7/labreserva`, branch `main`.
+- A primeira execução remota do GitHub Actions (`39661076622`) aprovou lint, tipos, 64 testes unitários, worker Deno e **204 asserções pgTAP nativas no Supabase local do runner**. Essa evidência atualiza a pendência histórica de pgTAP abaixo.
+- A integração teve um teste aprovado e quatro falhas por `Email logins are disabled`. Corrigido o provider de e-mail local: `[auth.email].enable_signup=true` habilita o login, enquanto `[auth].enable_signup=false` continua bloqueando o cadastro público. O teste HTTP confere os dois flags antes de testar o bloqueio de signup. A repetição do CI ainda é necessária.
+- Supabase conectado à organização `HenryGabriel7`; criação do projeto aguarda a escolha explícita da organização. A Vercel ainda não possui autenticação válida neste ambiente. Nenhum banco hospedado ou deploy foi criado nesta preparação.
+
+---
+
 Atualizado em 21/10/2026. As 11 etapas foram implementadas e commitadas em ordem. Cada checkpoint executa lint, typecheck e unidade antes de permitir o commit. A validação com os serviços reais permanece pendente pelas limitações de ambiente descritas abaixo.
 
 ## Etapas concluídas
@@ -71,6 +80,7 @@ Provisionar os serviços e executar as verificações de integração acima. A i
 - Próximo passo: E2E, CI e documentação.
 
 ## Etapa 11 — E2E, CI e documentação
+
 - Feito: implementação da etapa incluída neste commit.
 - Verificado: lint, typecheck e Vitest passaram localmente.
 - Pendente: testes Supabase/pgTAP e integração exigem Docker + serviços e credenciais; executar conforme README. Não foram considerados aprovados.
