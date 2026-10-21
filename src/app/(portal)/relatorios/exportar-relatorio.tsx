@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Download, FileText, LoaderCircle } from "lucide-react";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import type { PeriodoRelatorio } from "@/lib/relatorios";
 
 export function ExportarRelatorio({

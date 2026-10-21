@@ -1,0 +1,52 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions;
+select no_plan();
+
+insert into auth.users(id,email) values
+ ('b1200000-0000-4000-8000-000000000001','primeiro-admin@teste.edu.br'),
+ ('b1200000-0000-4000-8000-000000000002','segundo-admin@teste.edu.br');
+select ok(not has_function_privilege('anon','public.inicializar_administrador(uuid,text,text,text,text,text)','EXECUTE'),'anon não executa bootstrap');
+select ok(not has_function_privilege('authenticated','public.inicializar_administrador(uuid,text,text,text,text,text)','EXECUTE'),'usuário autenticado não executa bootstrap');
+select ok(has_function_privilege('service_role','public.inicializar_administrador(uuid,text,text,text,text,text)','EXECUTE'),'somente service_role recebe execução do bootstrap');
+set local role authenticated;
+select throws_ok($$select public.inicializar_administrador('b1200000-0000-4000-8000-000000000001','Primeiro Admin','primeiro-admin@teste.edu.br',null,'hash-convite-bootstrap-local-123456','https://portal.teste.edu.br')$$,'42501',null,'chamada autenticada direta é negada antes de provisionar');
+reset role;
+set local role service_role;
+select throws_ok($$select public.inicializar_administrador('b1200000-0000-4000-8000-000000000001','Primeiro Admin','primeiro-admin@teste.edu.br',null,'hash-convite-bootstrap-local-123456','https://portal.teste.edu.br')$$,'42501','BOOTSTRAP_JA_REALIZADO','seed já contém administrador e fecha o bootstrap');
+reset role;
+update public.profiles set ativo=false where id in(select user_id from public.user_roles where papel='admin');
+set local role service_role;
+select throws_ok($$select public.inicializar_administrador('b1200000-0000-4000-8000-000000000001','Primeiro Admin','primeiro-admin@teste.edu.br',null,'hash-convite-bootstrap-local-123456','https://portal.teste.edu.br')$$,'42501','BOOTSTRAP_JA_REALIZADO','administrador inativo também impede novo bootstrap');
+reset role;
+delete from public.user_roles where papel='admin';
+
+update public.configuracoes set valor='["restrito.edu.br"]'::jsonb where chave='dominios_email_permitidos';
+set local role service_role;
+select throws_ok($$select public.inicializar_administrador('b1200000-0000-4000-8000-000000000001','Primeiro Admin','primeiro-admin@teste.edu.br',null,'hash-convite-bootstrap-local-123456','https://portal.teste.edu.br')$$,'P0001','DOMINIO_NAO_PERMITIDO','bootstrap respeita domínios permitidos');
+reset role;
+select is((select count(*)::int from public.profiles where id='b1200000-0000-4000-8000-000000000001'),0,'domínio recusado não deixa perfil parcial');
+update public.configuracoes set valor='[]'::jsonb where chave='dominios_email_permitidos';
+set local role service_role;
+select throws_ok($$select public.inicializar_administrador('b1200000-0000-4000-8000-000000000001','Primeiro Admin','outra-pessoa@teste.edu.br',null,'hash-convite-bootstrap-local-123456','https://portal.teste.edu.br')$$,'P0001','USUARIO_AUTH_INVALIDO','identidade deve corresponder ao email do convite');
+select throws_ok($$select public.inicializar_administrador('b1200000-0000-4000-8000-000000000001','Primeiro Admin','primeiro-admin@teste.edu.br',null,'curto','https://portal.teste.edu.br')$$,'P0001','ENTRADA_INVALIDA','token inválido não cria conta administrativa');
+select throws_ok($$select public.inicializar_administrador('b1200000-0000-4000-8000-000000000001','Primeiro Admin','primeiro-admin@teste.edu.br',null,'hash-convite-bootstrap-local-123456','http://site-externo.teste')$$,'P0001','ENTRADA_INVALIDA','HTTP não local é rejeitado para confirmação do convite');
+select throws_ok($$select public.inicializar_administrador('b1200000-0000-4000-8000-000000000001','Primeiro Admin','primeiro-admin@teste.edu.br','ALU001','hash-convite-bootstrap-local-123456','https://portal.teste.edu.br')$$,'23505',null,'erro de matrícula única reverte o provisionamento');
+reset role;
+select is((select count(*)::int from public.profiles where id='b1200000-0000-4000-8000-000000000001'),0,'falha mantém ausência de perfil');
+select is((select count(*)::int from public.user_roles where user_id='b1200000-0000-4000-8000-000000000001'),0,'falha não deixa papel administrativo');
+select is((select count(*)::int from public.notificacoes where usuario_id='b1200000-0000-4000-8000-000000000001'),0,'falha não deixa convite parcial na fila');
+set local role service_role;
+select is(public.inicializar_administrador('b1200000-0000-4000-8000-000000000001',' Primeiro Admin ','PRIMEIRO-ADMIN@TESTE.EDU.BR',null,'hash-convite-bootstrap-local-123456','https://portal.teste.edu.br/'),'b1200000-0000-4000-8000-000000000001'::uuid,'primeiro provisionamento cria administrador atomicamente');
+reset role;
+select is((select nome from public.profiles where id='b1200000-0000-4000-8000-000000000001'),'Primeiro Admin','nome é normalizado');
+select is((select email from public.profiles where id='b1200000-0000-4000-8000-000000000001'),'primeiro-admin@teste.edu.br','email é normalizado');
+select is((select count(*)::int from public.user_roles where user_id='b1200000-0000-4000-8000-000000000001' and papel='admin'),1,'primeiro perfil tem um papel admin');
+select ok(exists(select 1 from public.notificacoes where usuario_id='b1200000-0000-4000-8000-000000000001' and tipo_evento='convite' and essencial and status='pendente' and payload->>'url'='https://portal.teste.edu.br/auth/confirm?token_hash=hash-convite-bootstrap-local-123456&type=invite'),'convite essencial usa fila e confirmação do servidor');
+select ok(exists(select 1 from public.audit_log where acao='inicializar_administrador' and entidade_id='b1200000-0000-4000-8000-000000000001' and ator_id='b1200000-0000-4000-8000-000000000001' and depois->>'bootstrap'='true' and depois::text not like '%hash-convite%'),'bootstrap registra auditoria sem incluir o token');
+set local role service_role;
+select throws_ok($$select public.inicializar_administrador('b1200000-0000-4000-8000-000000000002','Segundo Admin','segundo-admin@teste.edu.br',null,'outro-hash-convite-bootstrap-123456','https://portal.teste.edu.br')$$,'42501','BOOTSTRAP_JA_REALIZADO','segundo provisionamento é recusado mesmo com service_role');
+reset role;
+select is((select count(*)::int from public.profiles where id='b1200000-0000-4000-8000-000000000002'),0,'segunda tentativa não cria outro perfil');
+select * from finish();
+rollback;

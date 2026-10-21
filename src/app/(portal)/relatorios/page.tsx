@@ -186,7 +186,12 @@ export default async function RelatoriosPage({
               </Link>
             </div>
             {pagina.length ? (
-              <div className="table-scroll">
+              <div
+                className="table-scroll"
+                tabIndex={0}
+                role="region"
+                aria-label="Tabela com rolagem horizontal"
+              >
                 <table className="data-table">
                   <caption className="sr-only">
                     Solicitações por laboratório no período escolhido
@@ -239,7 +244,12 @@ export default async function RelatoriosPage({
                 <h2>Solicitações por papel</h2>
               </div>
               {relatorio.por_papel.length ? (
-                <div className="table-scroll">
+                <div
+                  className="table-scroll"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Tabela com rolagem horizontal"
+                >
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -269,7 +279,12 @@ export default async function RelatoriosPage({
                 <h2>Ocorrências do período</h2>
               </div>
               {relatorio.ocorrencias.length ? (
-                <div className="table-scroll">
+                <div
+                  className="table-scroll"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Tabela com rolagem horizontal"
+                >
                   <table className="data-table">
                     <thead>
                       <tr>

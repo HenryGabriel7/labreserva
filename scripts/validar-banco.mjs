@@ -3,10 +3,10 @@
  * NÃO substitui `supabase test db`: Auth, Storage, Vault, cron, net e o protocolo
  * pgTAP são adaptadores locais. Não testa GoTrue, HTTP, jobs nem concorrência.
  */
-import { readFile, readdir } from 'node:fs/promises';
-import { PGlite } from '@electric-sql/pglite';
-import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
-import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist';
+import { readFile, readdir } from "node:fs/promises";
+import { PGlite } from "@electric-sql/pglite";
+import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 
 const db = new PGlite({ extensions: { pgcrypto, btree_gist } });
 let total = 0;
@@ -19,7 +19,9 @@ try {
     grant usage on schema extensions to anon;
     create table auth.users(instance_id uuid,id uuid primary key,aud text,role text,email text,encrypted_password text,email_confirmed_at timestamptz,raw_app_meta_data jsonb,raw_user_meta_data jsonb,created_at timestamptz,updated_at timestamptz,confirmation_token text,email_change text,email_change_token_new text,recovery_token text);
     create table auth.identities(id uuid primary key,user_id uuid references auth.users(id),provider_id text,identity_data jsonb,provider text,last_sign_in_at timestamptz,created_at timestamptz,updated_at timestamptz,unique(provider_id,provider));
-    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+    create table auth.sessions(id uuid primary key,user_id uuid not null references auth.users(id),created_at timestamptz,updated_at timestamptz,not_after timestamptz);
+    create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb) $$;
+    create function auth.uid() returns uuid language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.sub',true),''),auth.jwt()->>'sub')::uuid $$;
     create table storage.buckets(id text primary key,name text,public bool,file_size_limit bigint,allowed_mime_types text[]);
     create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text);
     alter table storage.objects enable row level security;
@@ -28,17 +30,21 @@ try {
     create function cron.schedule(text,text,text) returns bigint language sql as $$ select 1::bigint $$;
     create function net.http_post(url text,headers jsonb,body jsonb,timeout_milliseconds integer) returns bigint language sql as $$ select 1::bigint $$;
   `);
-  const migrations = (await readdir('supabase/migrations')).filter((f) => f.endsWith('.sql')).sort();
+  const migrations = (await readdir("supabase/migrations"))
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
   for (const migration of migrations) {
-    const sql = (await readFile(`supabase/migrations/${migration}`, 'utf8')).replace(
+    const sql = (
+      await readFile(`supabase/migrations/${migration}`, "utf8")
+    ).replace(
       /^create extension if not exists (pg_cron|pg_net|supabase_vault).*;\r?\n/gm,
-      '',
+      "",
     );
     await db.exec(sql);
     console.log(`Migration carregada: ${migration}`);
   }
-  await db.exec(await readFile('supabase/seed.sql', 'utf8'));
-  console.log('Seed executado no PostgreSQL embutido.');
+  await db.exec(await readFile("supabase/seed.sql", "utf8"));
+  console.log("Seed executado no PostgreSQL embutido.");
 
   // Adaptador das seis asserções TAP usadas nas suites. Dynamic SQL é INVOKER:
   // SET ROLE authenticated/anon continua efetivo dentro de lives_ok/throws_ok.
@@ -70,32 +76,36 @@ try {
     create function extensions.finish() returns setof text language sql as $$ select '1..'||count(*) from extensions._tap_resultados $$;
     grant execute on all functions in schema extensions to anon,authenticated,service_role;
   `);
-  const suites = (await readdir('supabase/tests')).filter((f) => f.endsWith('.sql')).sort();
+  const suites = (await readdir("supabase/tests"))
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
   const falhas = [];
   for (const suite of suites) {
-    const sql = (await readFile(`supabase/tests/${suite}`, 'utf8')).replace(
+    const sql = (await readFile(`supabase/tests/${suite}`, "utf8")).replace(
       /^create extension if not exists pgtap.*;\r?\n/gm,
-      '',
+      "",
     );
     const results = await db.exec(sql);
     let contagem = 0;
     for (const result of results) {
       for (const row of result.rows ?? []) {
         for (const value of Object.values(row)) {
-          if (typeof value !== 'string') continue;
+          if (typeof value !== "string") continue;
           if (/^(ok|not ok) \d+/.test(value)) contagem++;
-          if (value.startsWith('not ok ')) falhas.push(`${suite}: ${value}`);
+          if (value.startsWith("not ok ")) falhas.push(`${suite}: ${value}`);
         }
       }
     }
     total += contagem;
     console.log(`${suite}: ${contagem} asserções exercitadas.`);
   }
-  if (falhas.length) throw new Error(falhas.join('\n'));
-  console.log(`${total} asserções passaram no PostgreSQL embutido; Supabase/pgTAP real permanece obrigatório.`);
+  if (falhas.length) throw new Error(falhas.join("\n"));
+  console.log(
+    `${total} asserções passaram no PostgreSQL embutido; Supabase/pgTAP real permanece obrigatório.`,
+  );
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-  if (error && typeof error === 'object' && 'position' in error) {
+  if (error && typeof error === "object" && "position" in error) {
     console.error(`Posição SQL: ${error.position}`);
   }
   process.exitCode = 1;

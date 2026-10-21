@@ -1,17 +1,253 @@
 import Link from "next/link";
-import { ChevronLeft,ChevronRight,CalendarDays,Plus } from "lucide-react";
-import { formatInTimeZone,fromZonedTime } from "date-fns-tz";
+import { ChevronLeft, ChevronRight, CalendarDays, Plus } from "lucide-react";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
-import { diasCalendario,somarDias } from "@/lib/reservas";
+import { diasCalendario, somarDias } from "@/lib/reservas";
 import type { Laboratorio } from "@/lib/types";
-export type Ocupado={inicio:string;fim:string;escopo:string;quantidades:unknown;bloqueado:boolean};
-export function Calendario({laboratorios,lab,data,visao,ocupados}:{laboratorios:Laboratorio[];lab:string;data:string;visao:"dia"|"semana"|"mes";ocupados:Ocupado[]}){
-  const dias=diasCalendario(data,visao);const url=(d=data,v=visao)=>`/calendario?lab=${lab}&data=${d}&visao=${v}`;const delta=visao==="dia"?1:visao==="semana"?7:28;
-  const horaLocal=(d:string,h:number)=>fromZonedTime(`${d}T${String(h).padStart(2,"0")}:00:00`,"America/Sao_Paulo").getTime();
-  const ocupacao=(d:string,h:number)=>ocupados.filter(o=>new Date(o.inicio).getTime()<horaLocal(d,h+1)&&new Date(o.fim).getTime()>horaLocal(d,h));
-  return <section className="panel calendar-panel"><div className="calendar-toolbar"><form action="/calendario" className="calendar-select"><input type="hidden" name="visao" value={visao}/><label className="sr-only" htmlFor="laboratorio-calendario">Laboratório</label><select id="laboratorio-calendario" name="lab" defaultValue={lab} className="input">{laboratorios.map(l=><option key={l.id} value={l.id}>{l.nome}</option>)}</select><label className="sr-only" htmlFor="data-calendario">Data</label><input className="input" type="date" id="data-calendario" name="data" defaultValue={data}/><button type="submit" className="button button-outline button-sm">Consultar</button></form><div className="calendar-views" aria-label="Visualização">{([['dia','Dia'],['semana','Semana'],['mes','Mês']] as const).map(([v,t])=><Link href={url(data,v)} key={v} className={visao===v?"selected":""} aria-current={visao===v?"page":undefined}>{t}</Link>)}</div></div>
-    <div className="calendar-period"><div className="page-actions"><Link className="button button-ghost button-icon" href={url(somarDias(data,-delta))} aria-label="Período anterior"><ChevronLeft size={17}/></Link><h2>{formatInTimeZone(new Date(`${data}T12:00:00Z`),"America/Sao_Paulo",visao==="dia"?"dd 'de' MMMM, yyyy":"MMMM 'de' yyyy",{locale:ptBR})}</h2><Link className="button button-ghost button-icon" href={url(somarDias(data,delta))} aria-label="Próximo período"><ChevronRight size={17}/></Link></div><Link className="button button-outline button-sm" href={url(formatInTimeZone(new Date(),"America/Sao_Paulo","yyyy-MM-dd"))}><CalendarDays size={13}/>Hoje</Link></div>
-    {visao==="mes"?<div className="month-grid">{["SEG","TER","QUA","QUI","SEX","SÁB","DOM"].map(d=><div className="month-weekday" key={d}>{d}</div>)}{dias.map(d=>{const n=ocupados.filter(o=>formatInTimeZone(new Date(o.inicio),"America/Sao_Paulo","yyyy-MM-dd")===d).length;return <Link key={d} href={url(d,"dia")} className={`month-day ${d.slice(0,7)!==data.slice(0,7)?"other-month":""}`}><span>{Number(d.slice(-2))}</span>{n>0&&<small>{n} intervalo{n!==1?"s":""}<span> ocupado{n!==1?"s":""}</span></small>}</Link>;})}</div>:<div className="calendar-scroll"><table className={`calendar-table ${visao==="semana"?"calendar-week":""}`}><thead><tr><th>Horário</th>{dias.map(d=><th key={d}><span>{formatInTimeZone(new Date(`${d}T12:00Z`),"America/Sao_Paulo","EEE",{locale:ptBR})}</span><strong>{Number(d.slice(-2))}</strong></th>)}</tr></thead><tbody>{Array.from({length:14},(_,i)=>i+8).map(h=><tr key={h}><th>{String(h).padStart(2,"0")}:00</th>{dias.map(d=>{const itens=ocupacao(d,h);return <td key={d}>{itens.length?<div className={`calendar-block ${itens.some(o=>o.bloqueado)?"calendar-block-unavailable":itens.some(o=>o.escopo==="laboratorio")?"calendar-block-room":"calendar-block-equipment"}`}><strong>{itens.some(o=>o.bloqueado)?"Bloqueado":itens.some(o=>o.escopo==="laboratorio")?"Laboratório reservado":"Equipamentos em uso"}</strong><span>{String(h).padStart(2,"0")}:00 – {String(h+1).padStart(2,"0")}:00</span></div>:<Link className="calendar-free" href={`/reservas/nova?lab=${lab}&data=${d}&inicio=${String(h).padStart(2,"0")}:00&fim=${String(h+1).padStart(2,"0")}:00`} aria-label={`Solicitar ${d} às ${h} horas`}><Plus size={13}/><span>Solicitar horário</span></Link>}</td>;})}</tr>)}</tbody></table></div>}
-    <div className="calendar-legend"><span><i className="legend-free"/>Sem ocupação aprovada</span><span><i className="legend-room"/>Laboratório reservado</span><span><i className="legend-equipment"/>Equipamentos em uso</span><span><i className="legend-blocked"/>Bloqueio</span></div><p className="calendar-footnote">A agenda não exibe informações pessoais. Horários livres ainda dependem das regras de funcionamento e de aprovação.</p>
-  </section>;
+export type Ocupado = {
+  inicio: string;
+  fim: string;
+  escopo: string;
+  quantidades: unknown;
+  bloqueado: boolean;
+};
+export function Calendario({
+  laboratorios,
+  lab,
+  data,
+  visao,
+  ocupados,
+}: {
+  laboratorios: Laboratorio[];
+  lab: string;
+  data: string;
+  visao: "dia" | "semana" | "mes";
+  ocupados: Ocupado[];
+}) {
+  const dias = diasCalendario(data, visao);
+  const url = (d = data, v = visao) =>
+    `/calendario?lab=${lab}&data=${d}&visao=${v}`;
+  const delta = visao === "dia" ? 1 : visao === "semana" ? 7 : 28;
+  const horaLocal = (d: string, h: number) =>
+    fromZonedTime(
+      `${d}T${String(h).padStart(2, "0")}:00:00`,
+      "America/Sao_Paulo",
+    ).getTime();
+  const ocupacao = (d: string, h: number) =>
+    ocupados.filter(
+      (o) =>
+        new Date(o.inicio).getTime() < horaLocal(d, h + 1) &&
+        new Date(o.fim).getTime() > horaLocal(d, h),
+    );
+  return (
+    <section className="panel calendar-panel">
+      <div className="calendar-toolbar">
+        <form action="/calendario" className="calendar-select">
+          <input type="hidden" name="visao" value={visao} />
+          <label className="sr-only" htmlFor="laboratorio-calendario">
+            Laboratório
+          </label>
+          <select
+            id="laboratorio-calendario"
+            name="lab"
+            defaultValue={lab}
+            className="input"
+          >
+            {laboratorios.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.nome}
+              </option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="data-calendario">
+            Data
+          </label>
+          <input
+            className="input"
+            type="date"
+            id="data-calendario"
+            name="data"
+            defaultValue={data}
+          />
+          <button type="submit" className="button button-outline button-sm">
+            Consultar
+          </button>
+        </form>
+        <div className="calendar-views" aria-label="Visualização">
+          {(
+            [
+              ["dia", "Dia"],
+              ["semana", "Semana"],
+              ["mes", "Mês"],
+            ] as const
+          ).map(([v, t]) => (
+            <Link
+              href={url(data, v)}
+              key={v}
+              className={visao === v ? "selected" : ""}
+              aria-current={visao === v ? "page" : undefined}
+            >
+              {t}
+            </Link>
+          ))}
+        </div>
+      </div>
+      <div className="calendar-period">
+        <div className="page-actions">
+          <Link
+            className="button button-ghost button-icon"
+            href={url(somarDias(data, -delta))}
+            aria-label="Período anterior"
+          >
+            <ChevronLeft size={17} />
+          </Link>
+          <h2>
+            {formatInTimeZone(
+              new Date(`${data}T12:00:00Z`),
+              "America/Sao_Paulo",
+              visao === "dia" ? "dd 'de' MMMM, yyyy" : "MMMM 'de' yyyy",
+              { locale: ptBR },
+            )}
+          </h2>
+          <Link
+            className="button button-ghost button-icon"
+            href={url(somarDias(data, delta))}
+            aria-label="Próximo período"
+          >
+            <ChevronRight size={17} />
+          </Link>
+        </div>
+        <Link
+          className="button button-outline button-sm"
+          href={url(
+            formatInTimeZone(new Date(), "America/Sao_Paulo", "yyyy-MM-dd"),
+          )}
+        >
+          <CalendarDays size={13} />
+          Hoje
+        </Link>
+      </div>
+      {visao === "mes" ? (
+        <div className="month-grid">
+          {["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"].map((d) => (
+            <div className="month-weekday" key={d}>
+              {d}
+            </div>
+          ))}
+          {dias.map((d) => {
+            const n = ocupados.filter(
+              (o) =>
+                formatInTimeZone(
+                  new Date(o.inicio),
+                  "America/Sao_Paulo",
+                  "yyyy-MM-dd",
+                ) === d,
+            ).length;
+            return (
+              <Link
+                key={d}
+                href={url(d, "dia")}
+                className={`month-day ${d.slice(0, 7) !== data.slice(0, 7) ? "other-month" : ""}`}
+              >
+                <span>{Number(d.slice(-2))}</span>
+                {n > 0 && (
+                  <small>
+                    {n} intervalo{n !== 1 ? "s" : ""}
+                    <span> ocupado{n !== 1 ? "s" : ""}</span>
+                  </small>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="calendar-scroll">
+          <table
+            className={`calendar-table ${visao === "semana" ? "calendar-week" : ""}`}
+          >
+            <thead>
+              <tr>
+                <th>Horário</th>
+                {dias.map((d) => (
+                  <th key={d}>
+                    <span>
+                      {formatInTimeZone(
+                        new Date(`${d}T12:00Z`),
+                        "America/Sao_Paulo",
+                        "EEE",
+                        { locale: ptBR },
+                      )}
+                    </span>
+                    <strong>{Number(d.slice(-2))}</strong>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 14 }, (_, i) => i + 8).map((h) => (
+                <tr key={h}>
+                  <th>{String(h).padStart(2, "0")}:00</th>
+                  {dias.map((d) => {
+                    const itens = ocupacao(d, h);
+                    return (
+                      <td key={d}>
+                        {itens.length ? (
+                          <div
+                            className={`calendar-block ${itens.some((o) => o.bloqueado) ? "calendar-block-unavailable" : itens.some((o) => o.escopo === "laboratorio") ? "calendar-block-room" : "calendar-block-equipment"}`}
+                          >
+                            <strong>
+                              {itens.some((o) => o.bloqueado)
+                                ? "Bloqueado"
+                                : itens.some((o) => o.escopo === "laboratorio")
+                                  ? "Laboratório reservado"
+                                  : "Equipamentos em uso"}
+                            </strong>
+                            <span>
+                              {String(h).padStart(2, "0")}:00 –{" "}
+                              {String(h + 1).padStart(2, "0")}:00
+                            </span>
+                          </div>
+                        ) : (
+                          <Link
+                            className="calendar-free"
+                            href={`/reservas/nova?lab=${lab}&data=${d}&inicio=${String(h).padStart(2, "0")}:00&fim=${String(h + 1).padStart(2, "0")}:00`}
+                            aria-label={`Solicitar ${d} às ${h} horas`}
+                          >
+                            <Plus size={13} />
+                            <span>Solicitar horário</span>
+                          </Link>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="calendar-legend">
+        <span>
+          <i className="legend-free" />
+          Sem ocupação aprovada
+        </span>
+        <span>
+          <i className="legend-room" />
+          Laboratório reservado
+        </span>
+        <span>
+          <i className="legend-equipment" />
+          Equipamentos em uso
+        </span>
+        <span>
+          <i className="legend-blocked" />
+          Bloqueio
+        </span>
+      </div>
+      <p className="calendar-footnote">
+        A agenda não exibe informações pessoais. Horários livres ainda dependem
+        das regras de funcionamento e de aprovação.
+      </p>
+    </section>
+  );
 }

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Download, ShieldCheck } from "lucide-react";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 
 const mensagemSchema = z.object({ error: z.string() }).strict();
 export function PrivacidadeForm({

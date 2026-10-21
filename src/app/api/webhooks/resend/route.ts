@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   cabecalhosPrivados,

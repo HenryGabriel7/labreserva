@@ -1,6 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { createClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { papeis, type Papel } from "@/lib/types";
 

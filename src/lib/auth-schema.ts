@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import Papa from "papaparse";
 import { papeis } from "@/lib/types";
 

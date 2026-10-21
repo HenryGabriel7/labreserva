@@ -131,7 +131,7 @@
 .auth-card .auth-description {
   font-size: 13px;
   line-height: 1.8;
-  color: #6b7f8c;
+  color: #526976;
   margin-bottom: 30px;
 }
 .auth-kicker {
@@ -183,7 +183,7 @@
 .auth-help {
   font-size: 11px;
   line-height: 1.8;
-  color: #748592;
+  color: #526976;
   text-align: center;
   border-top: 1px solid #edf0f2;
   padding-top: 22px;
@@ -213,7 +213,7 @@
   justify-content: space-between;
   gap: 15px;
   font-size: 10px;
-  color: #83929d;
+  color: #526976;
 }
 .auth-footer a {
   display: flex;

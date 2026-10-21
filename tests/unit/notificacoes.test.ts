@@ -269,12 +269,10 @@ describe("templates pt-BR e provider", () => {
     expect(send.mock.calls[1][1]).toEqual(chave);
   });
   it("não persiste mensagens do provedor que poderiam conter dados ou tokens", async () => {
-    const send = vi
-      .fn()
-      .mockResolvedValue({
-        data: null,
-        error: { name: "validation_error", message: "token=SEGREDO_PRIVADO" },
-      });
+    const send = vi.fn().mockResolvedValue({
+      data: null,
+      error: { name: "validation_error", message: "token=SEGREDO_PRIVADO" },
+    });
     const provider = new ResendNotificationProvider(
       "somente-teste",
       "avisos@exemplo.edu.br",

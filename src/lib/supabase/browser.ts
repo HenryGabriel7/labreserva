@@ -1,6 +1,6 @@
 "use client";
 import { createBrowserClient } from "@supabase/ssr";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 
 const configuracaoPublicaSchema = z
   .object({ url: z.url(), publishableKey: z.string().min(1) })

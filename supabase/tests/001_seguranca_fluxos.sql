@@ -14,6 +14,8 @@ insert into auth.users(id,email,raw_user_meta_data) values
  ('90000000-0000-4000-8000-000000000004','db-professor@teste.edu.br','{}'),
  ('90000000-0000-4000-8000-000000000005','db-aluno2@teste.edu.br','{}');
 insert into public.profiles(id,nome,email) select id,'Usuário de teste',email from auth.users where id::text like '90000000-%';
+insert into auth.sessions(id,user_id,created_at,updated_at,not_after)
+select id,id,now(),now(),now()+interval '1 day' from auth.users where id::text like '90000000-%';
 insert into public.user_roles(user_id,papel) values
  ('90000000-0000-4000-8000-000000000001','admin'),('90000000-0000-4000-8000-000000000002','monitor'),
  ('90000000-0000-4000-8000-000000000003','aluno'),('90000000-0000-4000-8000-000000000004','professor'),
@@ -45,6 +47,7 @@ select ok(not exists(select 1 from pg_policies where schemaname='public' and tab
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','90000000-0000-4000-8000-000000000003',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select is((select count(*)::int from public.reservas where id::text like '93000000-%'),1,'aluno só vê a própria reserva');
 select ok(not public.tem_papel('admin'),'metadata não concede admin');
 select throws_ok($$update public.reservas set status='aprovada' where id='93000000-0000-4000-8000-000000000001'$$,'42501',null,'aluno não muda status diretamente');
@@ -58,6 +61,7 @@ select throws_ok($$select public.solicitar_reserva('91000000-0000-4000-8000-0000
 select lives_ok($$select public.solicitar_reserva('91000000-0000-4000-8000-000000000001',public._teste_inicio(),public._teste_inicio()+interval '1 hour','laboratorio','Segunda pendente permitida',1)$$,'pendentes podem coexistir');
 
 select set_config('request.jwt.claim.sub','90000000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select is((select count(*)::int from public.reservas where id::text like '93000000-%'),3,'monitor só vê seu lab');
 select throws_ok($$select public.aprovar_reserva('93000000-0000-4000-8000-000000000003','Teste')$$,'42501','ACESSO_NEGADO','monitor fora do vínculo não decide');
 select throws_ok($$select public.aprovar_reserva('93000000-0000-4000-8000-000000000004','Teste')$$,'42501','DECISAO_PROPRIA_PROIBIDA','monitor não decide solicitação própria');
@@ -91,6 +95,7 @@ insert into public.reserva_equipamentos(reserva_id,equipamento_id,quantidade) va
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','90000000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select throws_ok($$select public.aprovar_reserva('93000000-0000-4000-8000-000000000005','Teste')$$,'P0001','CONFLITO_SALA','sala inteira impede equipamento');
 select lives_ok($$select public.aprovar_reserva('93000000-0000-4000-8000-000000000006','Intervalo adjacente')$$,'intervalos [início,fim) adjacentes são válidos');
 select lives_ok($$select public.substituir_reserva('93000000-0000-4000-8000-000000000001','93000000-0000-4000-8000-000000000011','Atividade curricular prioritária')$$,'substituição de aluno por professor é atômica');
@@ -98,6 +103,7 @@ select is((select status from public.reservas where id='93000000-0000-4000-8000-
 select is((select status from public.reservas where id='93000000-0000-4000-8000-000000000011'),'aprovada','nova reserva fica aprovada');
 
 select set_config('request.jwt.claim.sub','90000000-0000-4000-8000-000000000001',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select lives_ok($$select public.aprovar_reserva('93000000-0000-4000-8000-000000000009','Capacidade pelo pico temporal')$$,'estoque5 aceita q2 sobre q3 em intervalos distintos');
 select throws_ok($$select public.aprovar_reserva('93000000-0000-4000-8000-000000000010','Teste excesso')$$,'P0001','ESTOQUE_INSUFICIENTE','pico que supera estoque falha');
 select throws_ok($$select public.salvar_equipamento('{"quantidade":4}','92000000-0000-4000-8000-000000000002')$$,'P0001','ESTOQUE_INSUFICIENTE','CRUD não reduz estoque abaixo do pico aprovado');
@@ -108,6 +114,7 @@ reset role;
 update public.profiles set ativo=false where id='90000000-0000-4000-8000-000000000001';
 set local role authenticated;
 select set_config('request.jwt.claim.sub','90000000-0000-4000-8000-000000000001',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select is((select count(*)::int from public.laboratorios),0,'admin inativo perde leitura');
 select throws_ok($$select public.aprovar_reserva('93000000-0000-4000-8000-000000000002','Teste')$$,'42501','ACESSO_NEGADO','admin inativo perde RPC');
 reset role;
@@ -118,8 +125,10 @@ insert into public.reservas(id,laboratorio_id,solicitante_id,inicio,fim,escopo,f
  ('93000000-0000-4000-8000-000000000012','91000000-0000-4000-8000-000000000002','90000000-0000-4000-8000-000000000003',now()-interval '5 minutes',now()+interval '55 minutes','laboratorio','Atividade em andamento',1,1,'aluno','aprovada');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','90000000-0000-4000-8000-000000000003',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select throws_ok($$select public.cancelar_reserva('93000000-0000-4000-8000-000000000012','Cancelamento tardio')$$,'P0001','PRAZO_CANCELAMENTO_ENCERRADO','solicitante respeita prazo de cancelamento');
 select set_config('request.jwt.claim.sub','90000000-0000-4000-8000-000000000001',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select lives_ok($$select public.fazer_checkin('93000000-0000-4000-8000-000000000012','Entrada registrada')$$,'check-in aprovado para em uso');
 select throws_ok($$select public.fazer_checkin('93000000-0000-4000-8000-000000000012')$$,'P0001','TRANSICAO_INVALIDA','check-in duplicado falha');
 select lives_ok($$select public.fazer_checkout('93000000-0000-4000-8000-000000000012','Saída registrada')$$,'checkout conclui sessão');

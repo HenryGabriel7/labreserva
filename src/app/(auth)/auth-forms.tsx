@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { ArrowLeft, ArrowRight, LoaderCircle } from "lucide-react";
 import {
   loginAction,

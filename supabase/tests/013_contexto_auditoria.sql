@@ -1,0 +1,17 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = public,extensions;
+select no_plan();
+select set_config('request.headers','{"x-forwarded-for":"203.0.113.20, 10.0.0.1","user-agent":"Teste LabReserva","authorization":"credencial_nao_deve_ir_para_auditoria","cookie":"sessao_secreta"}',true);
+select public._auditar('teste_contexto','testes','00000000-0000-4000-8000-000000009013',null,null,null);
+select is((select host(ip) from public.audit_log where acao='teste_contexto'),'203.0.113.20','captura somente primeiro IP encaminhado');
+select is((select user_agent from public.audit_log where acao='teste_contexto'),'Teste LabReserva','captura user-agent sem headers sensíveis');
+select ok(not exists(select 1 from public.audit_log where acao='teste_contexto' and (to_jsonb(audit_log)::text like '%credencial_nao_deve_ir_para_auditoria%' or to_jsonb(audit_log)::text like '%sessao_secreta%')),'Authorization e cookies não entram na auditoria');
+select set_config('request.headers','{"x-forwarded-for":"invalido","user-agent":"Teste"}',true);
+select lives_ok($$select public._auditar('teste_ip_invalido','testes',null,null,null,null)$$,'IP inválido não impede decisão de negócio');
+select ok((select ip is null from public.audit_log where acao='teste_ip_invalido'),'IP inválido é descartado');
+set local role authenticated;
+select throws_ok($$select public._auditar('forjada','testes',null,null,null,null)$$,'42501',null,'cliente não forja auditoria diretamente');
+reset role;
+select * from finish();
+rollback;

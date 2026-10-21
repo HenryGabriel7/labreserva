@@ -1,5 +1,5 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 
 const fuso = "America/Sao_Paulo";
 const dataCivilSchema = z.iso.date();

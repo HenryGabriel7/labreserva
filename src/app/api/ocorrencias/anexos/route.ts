@@ -1,4 +1,43 @@
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-export async function GET(request:Request){const usuario=await getCurrentUser({sensitive:true});if(!usuario)return Response.json({mensagem:"Entre para continuar."},{status:401});const parsed=z.object({id:z.uuid()}).strict().safeParse(Object.fromEntries(new URL(request.url).searchParams));if(!parsed.success)return Response.json({mensagem:"Identificador inválido."},{status:400});const db=await createClient();const {data,error}=await db.from("ocorrencias").select("id,anexos").eq("id",parsed.data.id).maybeSingle();if(error||!data)return Response.json({mensagem:"Ocorrência não encontrada."},{status:404});const {data:urls,error:assinatura}=await db.storage.from("ocorrencias").createSignedUrls(data.anexos,60);if(assinatura)return Response.json({mensagem:"Não foi possível abrir os anexos."},{status:400});return Response.json({urls:urls?.map(u=>u.signedUrl)??[]},{headers:{"Cache-Control":"private, no-store"}});}
+export async function GET(request: Request) {
+  const usuario = await getCurrentUser({ sensitive: true });
+  if (!usuario)
+    return Response.json(
+      { mensagem: "Entre para continuar." },
+      { status: 401 },
+    );
+  const parsed = z
+    .object({ id: z.uuid() })
+    .strict()
+    .safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!parsed.success)
+    return Response.json(
+      { mensagem: "Identificador inválido." },
+      { status: 400 },
+    );
+  const db = await createClient();
+  const { data, error } = await db
+    .from("ocorrencias")
+    .select("id,anexos")
+    .eq("id", parsed.data.id)
+    .maybeSingle();
+  if (error || !data)
+    return Response.json(
+      { mensagem: "Ocorrência não encontrada." },
+      { status: 404 },
+    );
+  const { data: urls, error: assinatura } = await db.storage
+    .from("ocorrencias")
+    .createSignedUrls(data.anexos, 60);
+  if (assinatura)
+    return Response.json(
+      { mensagem: "Não foi possível abrir os anexos." },
+      { status: 400 },
+    );
+  return Response.json(
+    { urls: urls?.map((u) => u.signedUrl) ?? [] },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
+}

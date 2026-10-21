@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { getCurrentUser } from "@/lib/auth";
 import { LoginForm } from "../auth-forms";
 

@@ -1,0 +1,9 @@
+.next/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+supabase/.temp/
+supabase/.branches/
+supabase/functions/**/node_modules/
+supabase/functions/**/deno.lock

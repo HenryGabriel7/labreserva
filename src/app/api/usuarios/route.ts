@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -32,11 +33,8 @@ function origemPermitida(request: NextRequest) {
 
 async function lerJsonLimitado(request: NextRequest): Promise<unknown> {
   if (
-    request.headers
-      .get("content-type")
-      ?.split(";")[0]
-      ?.trim()
-      .toLowerCase() !== "application/json"
+    request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() !==
+    "application/json"
   )
     throw new Error("Entrada inválida.");
   const leitor = request.body?.getReader();
@@ -130,6 +128,22 @@ async function convidar(
   if (dominiosPermitidos.length && !dominiosPermitidos.includes(dominio))
     return false;
   const admin = createAdminClient();
+  // Reemitir um invite de uma conta ainda não confirmada invalida o token
+  // anterior. Verificar o perfil antes do Auth preserva o convite já enfileirado.
+  const existente = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", dados.email)
+    .maybeSingle();
+  if (existente.error || existente.data) return false;
+  // O orçamento atômico por endereço também bloqueia lotes concorrentes antes
+  // de gerar outro token. Uma falha de provisionamento pode ser repetida após a janela.
+  const limiteEmail = await admin.rpc("consumir_rate_limit", {
+    p_chave: `convite-email:${createHash("sha256").update(dados.email).digest("hex")}`,
+    p_limite: 1,
+    p_janela_segundos: 600,
+  });
+  if (limiteEmail.error || limiteEmail.data !== true) return false;
   // generateLink cria a identidade, mas não utiliza o SMTP padrão do Supabase.
   const { data, error } = await admin.auth.admin.generateLink({
     type: "invite",

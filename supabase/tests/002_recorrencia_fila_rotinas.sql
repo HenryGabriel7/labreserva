@@ -11,6 +11,8 @@ insert into auth.users(id,email) values
  ('94000000-0000-4000-8000-000000000001','serie-admin@teste.edu.br'),('94000000-0000-4000-8000-000000000002','serie-monitor@teste.edu.br'),
  ('94000000-0000-4000-8000-000000000003','serie-professor@teste.edu.br'),('94000000-0000-4000-8000-000000000004','serie-aluno@teste.edu.br');
 insert into public.profiles(id,nome,email) select id,'Usuário recorrência',email from auth.users where id::text like '94000000-%';
+insert into auth.sessions(id,user_id,created_at,updated_at,not_after)
+select id,id,now(),now(),now()+interval '1 day' from auth.users where id::text like '94000000-%';
 insert into public.user_roles(user_id,papel) values
  ('94000000-0000-4000-8000-000000000001','admin'),('94000000-0000-4000-8000-000000000002','monitor'),
  ('94000000-0000-4000-8000-000000000003','professor'),('94000000-0000-4000-8000-000000000004','aluno');
@@ -22,8 +24,10 @@ insert into public.bloqueios(laboratorio_id,inicio,fim,motivo,descricao) values(
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','94000000-0000-4000-8000-000000000004',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select throws_ok($$select public.solicitar_reserva('95000000-0000-4000-8000-000000000001',null,null,'laboratorio','Recorrência sem papel',10,'[]',null,jsonb_build_object('dia_semana',1,'hora_inicio','10:00','hora_fim','11:00','data_inicio',public._teste_dia(),'data_fim',public._teste_dia()+21,'excecoes',jsonb_build_array(public._teste_dia()+14)))$$,'42501','RECORRENCIA_NAO_PERMITIDA','aluno não solicita série');
 select set_config('request.jwt.claim.sub','94000000-0000-4000-8000-000000000003',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select lives_ok($$insert into public._teste_resultados values('serie',public.solicitar_reserva('95000000-0000-4000-8000-000000000001',null,null,'laboratorio','Série semanal para aula',10,'[]','Atividade curricular',jsonb_build_object('dia_semana',1,'hora_inicio','10:00','hora_fim','11:00','data_inicio',public._teste_dia(),'data_fim',public._teste_dia()+21,'excecoes',jsonb_build_array(public._teste_dia()+14))))$$,'professor cria série semanal');
 select is((select jsonb_array_length(valor->'reserva_ids') from public._teste_resultados where chave='serie'),2,'feriado e exceção são pulados');
 select is((select jsonb_array_length(valor->'datas_puladas') from public._teste_resultados where chave='serie'),1,'feriado pulado é informado');
@@ -37,6 +41,7 @@ insert into public.reservas(id,laboratorio_id,solicitante_id,inicio,fim,escopo,f
  ('97000000-0000-4000-8000-000000000001','95000000-0000-4000-8000-000000000001','94000000-0000-4000-8000-000000000004',public._teste_hora(21),public._teste_hora(21)+interval '1 hour','laboratorio','Ocupação conflitante da série',1,1,'aluno','aprovada');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','94000000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select lives_ok($$insert into public._teste_resultados values('aprovacao',public.aprovar_serie((select (valor->>'recorrencia_id')::uuid from public._teste_resultados where chave='serie'),'Série curricular'))$$,'aprovar série mantém conflitos individuais');
 select is((select jsonb_array_length(valor->'aprovadas') from public._teste_resultados where chave='aprovacao'),1,'aprova a data livre');
 select is((select jsonb_array_length(valor->'conflitantes') from public._teste_resultados where chave='aprovacao'),1,'lista a data conflitante');
@@ -49,6 +54,7 @@ insert into public.reservas(id,laboratorio_id,solicitante_id,inicio,fim,escopo,f
 insert into public.bloqueios(laboratorio_id,inicio,fim,motivo,descricao) values('95000000-0000-4000-8000-000000000001',public._teste_hora(1),public._teste_hora(1)+interval '1 hour','evento','Bloqueio para provar rollback');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','94000000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claims',jsonb_build_object('sub',current_setting('request.jwt.claim.sub'),'role','authenticated','session_id',current_setting('request.jwt.claim.sub'))::text,true);
 select throws_ok($$select public.substituir_reserva('97000000-0000-4000-8000-000000000002','97000000-0000-4000-8000-000000000003','Prioridade curricular')$$,'P0001','HORARIO_BLOQUEADO','falha na substituição faz rollback');
 select is((select status from public.reservas where id='97000000-0000-4000-8000-000000000002'),'aprovada','rollback preserva reserva antiga');
 select is((select status from public.reservas where id='97000000-0000-4000-8000-000000000003'),'pendente','rollback preserva nova pendente');

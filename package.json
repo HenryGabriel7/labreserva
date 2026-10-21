@@ -11,8 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:db": "supabase test db",
-    "test:e2e": "playwright test",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "node --env-file-if-exists=.env.local node_modules/@playwright/test/cli.js test",
+    "test:integration": "node --env-file-if-exists=.env.local node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts",
+    "test:db:smoke": "node scripts/validar-banco.mjs",
     "db:reset": "supabase db reset",
     "format": "prettier --write .",
     "prepare": "husky"
@@ -43,6 +44,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@electric-sql/pglite": "^0.5.10",
     "@eslint/eslintrc": "^3.3.1",
     "@playwright/test": "^1.55.1",

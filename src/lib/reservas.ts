@@ -1,8 +1,87 @@
 import type { Papel } from "./types";
-export function prioridadeSolicitante(papeis:Papel[]):1|2{return papeis.some(p=>p==="professor"||p==="funcionario")?2:1;}
-export function ordenarSolicitacoes<T extends {prioridade_efetiva:number;created_at:string;id:string}>(reservas:T[]):T[]{return [...reservas].sort((a,b)=>b.prioridade_efetiva-a.prioridade_efetiva||a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));}
-export function minutos(hora:string){const [h,m]=hora.split(":").map(Number);return h*60+m;}
-export function horariosSlots(inicio:string,fim:string,duracao:number):string[]{if(!Number.isInteger(duracao)||duracao<=0)throw new Error("Duração inválida");const resultado:string[]=[];for(let m=minutos(inicio);m<=minutos(fim);m+=duracao)resultado.push(`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`);return resultado;}
-export function intervaloValido({inicio,fim,abertura,fechamento,modo,granularidade,slot,minima,maxima}:{inicio:string;fim:string;abertura:string;fechamento:string;modo:"slot_fixo"|"intervalo_livre";granularidade:number;slot:number;minima:number;maxima:number}){const i=minutos(inicio),f=minutos(fim),a=minutos(abertura),z=minutos(fechamento),d=f-i,g=modo==="slot_fixo"?slot:granularidade;return g>0&&i>=a&&f<=z&&d>=minima&&d<=maxima&&d>0&&(i-a)%g===0&&d%g===0;}
-export function somarDias(data:string,n:number):string{const d=new Date(`${data}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
-export function diasCalendario(data:string,visao:"dia"|"semana"|"mes"):string[]{if(visao==="dia")return [data];const base=visao==="mes"?data.slice(0,8)+"01":data;const dow=new Date(`${base}T12:00:00Z`).getUTCDay();const inicio=somarDias(base,-((dow+6)%7));return Array.from({length:visao==="mes"?42:7},(_,i)=>somarDias(inicio,i));}
+export function prioridadeSolicitante(papeis: Papel[]): 1 | 2 {
+  return papeis.some((p) => p === "professor" || p === "funcionario") ? 2 : 1;
+}
+export function ordenarSolicitacoes<
+  T extends { prioridade_efetiva: number; created_at: string; id: string },
+>(reservas: T[]): T[] {
+  return [...reservas].sort(
+    (a, b) =>
+      b.prioridade_efetiva - a.prioridade_efetiva ||
+      a.created_at.localeCompare(b.created_at) ||
+      a.id.localeCompare(b.id),
+  );
+}
+export function minutos(hora: string) {
+  const [h, m] = hora.split(":").map(Number);
+  return h * 60 + m;
+}
+export function horariosSlots(
+  inicio: string,
+  fim: string,
+  duracao: number,
+): string[] {
+  if (!Number.isInteger(duracao) || duracao <= 0)
+    throw new Error("Duração inválida");
+  const resultado: string[] = [];
+  for (let m = minutos(inicio); m <= minutos(fim); m += duracao)
+    resultado.push(
+      `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`,
+    );
+  return resultado;
+}
+export function intervaloValido({
+  inicio,
+  fim,
+  abertura,
+  fechamento,
+  modo,
+  granularidade,
+  slot,
+  minima,
+  maxima,
+}: {
+  inicio: string;
+  fim: string;
+  abertura: string;
+  fechamento: string;
+  modo: "slot_fixo" | "intervalo_livre";
+  granularidade: number;
+  slot: number;
+  minima: number;
+  maxima: number;
+}) {
+  const i = minutos(inicio),
+    f = minutos(fim),
+    a = minutos(abertura),
+    z = minutos(fechamento),
+    d = f - i,
+    g = modo === "slot_fixo" ? slot : granularidade;
+  return (
+    g > 0 &&
+    i >= a &&
+    f <= z &&
+    d >= minima &&
+    d <= maxima &&
+    d > 0 &&
+    (i - a) % g === 0 &&
+    d % g === 0
+  );
+}
+export function somarDias(data: string, n: number): string {
+  const d = new Date(`${data}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+export function diasCalendario(
+  data: string,
+  visao: "dia" | "semana" | "mes",
+): string[] {
+  if (visao === "dia") return [data];
+  const base = visao === "mes" ? data.slice(0, 8) + "01" : data;
+  const dow = new Date(`${base}T12:00:00Z`).getUTCDay();
+  const inicio = somarDias(base, -((dow + 6) % 7));
+  return Array.from({ length: visao === "mes" ? 42 : 7 }, (_, i) =>
+    somarDias(inicio, i),
+  );
+}

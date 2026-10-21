@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { BellRing, Check, LoaderCircle } from "lucide-react";
 import {
   preferenciasNotificacaoSchema,

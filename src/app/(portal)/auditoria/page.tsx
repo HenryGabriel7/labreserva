@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import {
   dataBr,
   EmptyState,
@@ -180,7 +180,12 @@ export default async function AuditoriaPage({
           </div>
         ) : registros.length ? (
           <>
-            <div className="table-scroll">
+            <div
+              className="table-scroll"
+              tabIndex={0}
+              role="region"
+              aria-label="Tabela com rolagem horizontal"
+            >
               <table className="data-table">
                 <caption className="sr-only">
                   Auditoria filtrada, em ordem da ação mais recente

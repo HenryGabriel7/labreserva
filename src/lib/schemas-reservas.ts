@@ -1,10 +1,129 @@
-import { z } from "zod";
-const equipamento=z.object({equipamentoId:z.uuid(),quantidade:z.number().int().min(1).max(100000)}).strict();
-export const recorrenciaSchema=z.object({diaSemana:z.number().int().min(0).max(6),horaInicio:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),horaFim:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),dataInicio:z.iso.date(),dataFim:z.iso.date(),excecoes:z.array(z.iso.date()).max(200)}).strict().refine(v=>v.dataFim>=v.dataInicio&&v.horaFim>v.horaInicio,{message:"Confira o período da recorrência."});
-const campos={laboratorioId:z.uuid(),escopo:z.enum(["laboratorio","equipamentos"]),finalidade:z.string().trim().min(5,"Descreva a atividade em pelo menos 5 caracteres.").max(2000),nParticipantes:z.number().int().min(1).max(10000),justificativaPrioridade:z.string().max(2000),equipamentos:z.array(equipamento).max(100)};
-function conferirEquipamentos(v:{escopo:string;equipamentos:{equipamentoId:string}[]},ctx:z.RefinementCtx){if(v.escopo==="equipamentos"&&!v.equipamentos.length)ctx.addIssue({code:"custom",message:"Selecione pelo menos um equipamento.",path:["equipamentos"]});if(new Set(v.equipamentos.map(e=>e.equipamentoId)).size!==v.equipamentos.length)ctx.addIssue({code:"custom",message:"Um equipamento não pode aparecer duas vezes.",path:["equipamentos"]});}
-export const reservaSchema=z.object({...campos,inicio:z.iso.datetime({offset:true}),fim:z.iso.datetime({offset:true}),recorrencia:recorrenciaSchema.nullable().optional()}).strict().superRefine(conferirEquipamentos).refine(v=>new Date(v.fim)>new Date(v.inicio),{message:"O fim precisa ser depois do início.",path:["fim"]});
-export const reservaFormularioSchema=z.object({...campos,data:z.iso.date(),horaInicio:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),horaFim:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),repetir:z.boolean(),dataFim:z.string().max(10),excecoes:z.string().max(2000)}).strict().superRefine(conferirEquipamentos).superRefine((v,ctx)=>{if(v.repetir&&(!z.iso.date().safeParse(v.dataFim).success||v.dataFim<v.data))ctx.addIssue({code:"custom",message:"Selecione uma data final válida.",path:["dataFim"]});if(v.excecoes.split(",").map(d=>d.trim()).filter(Boolean).some(d=>!z.iso.date().safeParse(d).success))ctx.addIssue({code:"custom",message:"Use datas AAAA-MM-DD separadas por vírgula.",path:["excecoes"]});}).refine(v=>v.horaFim>v.horaInicio,{message:"O fim precisa ser depois do início.",path:["horaFim"]});
-export const cancelarSchema=z.object({reservaId:z.uuid(),motivo:z.string().trim().min(3,"Informe um motivo.").max(2000)}).strict();
-export const filtrosReservasSchema=z.object({status:z.enum(["","pendente","aprovada","recusada","cancelada","em_uso","concluida","no_show","substituida"]).optional(),pagina:z.coerce.number().int().min(1).max(10000).optional()}).strict();
-export type ReservaFormulario=z.infer<typeof reservaFormularioSchema>;
+import { z } from "@/lib/validacao";
+const equipamento = z
+  .object({
+    equipamentoId: z.uuid(),
+    quantidade: z.number().int().min(1).max(100000),
+  })
+  .strict();
+export const recorrenciaSchema = z
+  .object({
+    diaSemana: z.number().int().min(0).max(6),
+    horaInicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    horaFim: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    dataInicio: z.iso.date(),
+    dataFim: z.iso.date(),
+    excecoes: z.array(z.iso.date()).max(200),
+  })
+  .strict()
+  .refine((v) => v.dataFim >= v.dataInicio && v.horaFim > v.horaInicio, {
+    message: "Confira o período da recorrência.",
+  });
+const campos = {
+  laboratorioId: z.uuid(),
+  escopo: z.enum(["laboratorio", "equipamentos"]),
+  finalidade: z
+    .string()
+    .trim()
+    .min(5, "Descreva a atividade em pelo menos 5 caracteres.")
+    .max(2000),
+  nParticipantes: z.number().int().min(1).max(10000),
+  justificativaPrioridade: z.string().max(2000),
+  equipamentos: z.array(equipamento).max(100),
+};
+function conferirEquipamentos(
+  v: { escopo: string; equipamentos: { equipamentoId: string }[] },
+  ctx: z.RefinementCtx,
+) {
+  if (v.escopo === "equipamentos" && !v.equipamentos.length)
+    ctx.addIssue({
+      code: "custom",
+      message: "Selecione pelo menos um equipamento.",
+      path: ["equipamentos"],
+    });
+  if (
+    new Set(v.equipamentos.map((e) => e.equipamentoId)).size !==
+    v.equipamentos.length
+  )
+    ctx.addIssue({
+      code: "custom",
+      message: "Um equipamento não pode aparecer duas vezes.",
+      path: ["equipamentos"],
+    });
+}
+export const reservaSchema = z
+  .object({
+    ...campos,
+    inicio: z.iso.datetime({ offset: true }),
+    fim: z.iso.datetime({ offset: true }),
+    recorrencia: recorrenciaSchema.nullable().optional(),
+  })
+  .strict()
+  .superRefine(conferirEquipamentos)
+  .refine((v) => new Date(v.fim) > new Date(v.inicio), {
+    message: "O fim precisa ser depois do início.",
+    path: ["fim"],
+  });
+export const reservaFormularioSchema = z
+  .object({
+    ...campos,
+    data: z.iso.date(),
+    horaInicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    horaFim: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    repetir: z.boolean(),
+    dataFim: z.string().max(10),
+    excecoes: z.string().max(2000),
+  })
+  .strict()
+  .superRefine(conferirEquipamentos)
+  .superRefine((v, ctx) => {
+    if (
+      v.repetir &&
+      (!z.iso.date().safeParse(v.dataFim).success || v.dataFim < v.data)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Selecione uma data final válida.",
+        path: ["dataFim"],
+      });
+    if (
+      v.excecoes
+        .split(",")
+        .map((d) => d.trim())
+        .filter(Boolean)
+        .some((d) => !z.iso.date().safeParse(d).success)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Use datas AAAA-MM-DD separadas por vírgula.",
+        path: ["excecoes"],
+      });
+  })
+  .refine((v) => v.horaFim > v.horaInicio, {
+    message: "O fim precisa ser depois do início.",
+    path: ["horaFim"],
+  });
+export const cancelarSchema = z
+  .object({
+    reservaId: z.uuid(),
+    motivo: z.string().trim().min(3, "Informe um motivo.").max(2000),
+  })
+  .strict();
+export const filtrosReservasSchema = z
+  .object({
+    status: z
+      .enum([
+        "",
+        "pendente",
+        "aprovada",
+        "recusada",
+        "cancelada",
+        "em_uso",
+        "concluida",
+        "no_show",
+        "substituida",
+      ])
+      .optional(),
+    pagina: z.coerce.number().int().min(1).max(10000).optional(),
+  })
+  .strict();
+export type ReservaFormulario = z.infer<typeof reservaFormularioSchema>;

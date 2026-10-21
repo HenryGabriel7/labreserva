@@ -1,4 +1,319 @@
-.catalog-filters { display:flex; padding:15px; gap:12px; align-items:center; }.catalog-search { display:flex; align-items:center; gap:10px; color:#91a1aa; flex:1; min-width:160px; padding:0 10px; }.catalog-search input { border:0; outline:0; width:100%; font-size:12px; }.catalog-filters .input { font-size:11px; width:auto; min-width:140px; }.catalog-filters input.input { width:140px; min-width:100px; }.catalog-caption { display:flex; justify-content:space-between; color:#8b9da8; font-size:10px; margin:23px 1px 18px; }.catalog-caption a { color:#087f67; }.catalog-grid { display:grid; grid-template-columns:1fr 1fr; gap:23px; }.catalog-card { overflow:hidden; }.catalog-visual { display:flex; align-items:center; justify-content:space-between; height:140px; padding:30px; position:relative; background:#edf3f8; border-bottom:1px solid #e2e9ed; background-image:radial-gradient(#c5d4dd80 1px,transparent 1px); background-size:16px 16px; }.catalog-visual>.lab-icon { width:80px; height:80px; background:#ffffffb8; box-shadow:0 5px 16px #51687e0a; border:1px solid #ffffffee; border-radius:18px; }.catalog-visual>.badge { position:absolute; top:17px; right:18px; font-size:9px; background:#ffffffc4; }.catalog-room-code { color:#849aa9; text-transform:uppercase; letter-spacing:4px; font-size:12px; font-weight:500; }.catalog-visual-redes { background-color:#edf5ef; background-image:radial-gradient(#c1d8c780 1px,transparent 1px); }.catalog-visual-quimica { background-color:#f8f4e9; background-image:radial-gradient(#ddcfac80 1px,transparent 1px); }.catalog-visual-anatomia { background-color:#f3eff8; background-image:radial-gradient(#d7c9e580 1px,transparent 1px); }.catalog-body { padding:24px; }.catalog-body .eyebrow { font-size:8px; }.catalog-body h2 { margin:10px 0 10px; font-size:17px; letter-spacing:-.4px; font-weight:600; }.catalog-body>p { font-size:11px; line-height:1.8; color:#879aa6; margin:0 0 20px; min-height:40px; }.catalog-meta { display:flex; gap:20px; font-size:10px; color:#6d8594; }.catalog-meta>span { display:flex; gap:5px; align-items:center; }.catalog-tags { margin:17px 0 22px; display:flex; gap:7px; flex-wrap:wrap; }.catalog-tags>span { padding:4px 7px; color:#7f949f; background:#f3f6f8; border-radius:4px; font-size:9px; }.catalog-card-footer { display:flex; justify-content:space-between; align-items:center; padding-top:18px; border-top:1px solid #edf1f3; }.catalog-card-footer .section-link { font-size:10px; }.catalog-card-footer .button { font-size:10px; }.detail-columns { display:grid; grid-template-columns:1fr 300px; gap:24px; }.detail-card { padding:25px; margin-bottom:22px; }.detail-card h2 { font-size:15px; font-weight:600; margin:0 0 17px; }.detail-card p { font-size:12px; line-height:1.9; color:#718895; }.detail-info { display:flex; align-items:center; gap:20px; margin:20px 0; }.detail-info>span { display:flex; align-items:center; gap:7px; color:#6f8794; font-size:12px; }.settings-tabs { display:flex; gap:8px; border-bottom:1px solid #dce6e9; padding-bottom:12px; margin-bottom:24px; overflow-x:auto; }.settings-tabs button { white-space:nowrap; }.crud-layout { display:grid; grid-template-columns:1fr 1.1fr; gap:25px; align-items:start; }.crud-list { padding:7px 20px; }.crud-list-item { display:flex; justify-content:space-between; gap:12px; padding:15px 0; border-bottom:1px solid #edf1f3; }.crud-list-item:last-child { border:0; }.crud-list-item strong { font-size:12px; display:block; }.crud-list-item small { font-size:10px; color:#8498a3; display:block; margin-top:5px; }.crud-list-item>div:last-child { display:flex; gap:6px; align-items:center; }.crud-form { padding:24px; }.crud-form h2 { font-size:16px; margin:0 0 22px; font-weight:600; }.checkbox-label { display:flex; gap:8px; align-items:center; font-size:12px; font-weight:400; }.checkbox-label input { accent-color:#087f67; width:15px; height:15px; }.form-message { padding:12px; border-radius:6px; background:#eff6f2; color:#2c7356; font-size:12px; }.form-message-error { background:#fcefee; color:#a33434; }
-@media(min-width:1500px) { .catalog-grid { grid-template-columns:repeat(3,1fr); } }
-@media(max-width:1200px) { .catalog-filters { flex-wrap:wrap; }.catalog-search { flex-basis:100%; padding:6px 10px 12px; }.catalog-filters .input { flex:1; }.crud-layout { grid-template-columns:1fr; }.detail-columns { grid-template-columns:1fr 250px; } }
-@media(max-width:700px) { .catalog-grid { grid-template-columns:1fr; gap:18px; }.catalog-visual { height:125px; }.catalog-body { padding:20px; }.catalog-filters { padding:12px; gap:9px; }.catalog-filters .input { min-width:110px; }.catalog-caption>span:last-child { display:none; }.detail-columns { grid-template-columns:1fr; }.detail-info { flex-wrap:wrap; }.crud-form { padding:20px; }.detail-card { padding:20px; }.catalog-meta { gap:15px; font-size:9px; } }
+.catalog-filters {
+  display: flex;
+  padding: 15px;
+  gap: 12px;
+  align-items: center;
+}
+.catalog-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #626d73;
+  flex: 1;
+  min-width: 160px;
+  padding: 0 10px;
+}
+.catalog-search input {
+  border: 0;
+  outline: 0;
+  width: 100%;
+  font-size: 12px;
+}
+.catalog-filters .input {
+  font-size: 11px;
+  width: auto;
+  min-width: 140px;
+}
+.catalog-filters input.input {
+  width: 140px;
+  min-width: 100px;
+}
+.catalog-caption {
+  display: flex;
+  justify-content: space-between;
+  color: #647179;
+  font-size: 10px;
+  margin: 23px 1px 18px;
+}
+.catalog-caption a {
+  color: #077861;
+}
+.catalog-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 23px;
+}
+.catalog-card {
+  overflow: hidden;
+}
+.catalog-visual {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 140px;
+  padding: 30px;
+  position: relative;
+  background: #edf3f8;
+  border-bottom: 1px solid #e2e9ed;
+  background-image: radial-gradient(#c5d4dd80 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+.catalog-visual > .lab-icon {
+  width: 80px;
+  height: 80px;
+  background: #ffffffb8;
+  box-shadow: 0 5px 16px #51687e0a;
+  border: 1px solid #ffffffee;
+  border-radius: 18px;
+}
+.catalog-visual > .badge {
+  position: absolute;
+  top: 17px;
+  right: 18px;
+  font-size: 9px;
+  background: #ffffffc4;
+}
+.catalog-room-code {
+  color: #5f6f7a;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.catalog-visual-redes {
+  background-color: #edf5ef;
+  background-image: radial-gradient(#c1d8c780 1px, transparent 1px);
+}
+.catalog-visual-quimica {
+  background-color: #f8f4e9;
+  background-image: radial-gradient(#ddcfac80 1px, transparent 1px);
+}
+.catalog-visual-anatomia {
+  background-color: #f3eff8;
+  background-image: radial-gradient(#d7c9e580 1px, transparent 1px);
+}
+.catalog-body {
+  padding: 24px;
+}
+.catalog-body .eyebrow {
+  font-size: 8px;
+}
+.catalog-body h2 {
+  margin: 10px 0 10px;
+  font-size: 17px;
+  letter-spacing: -0.4px;
+  font-weight: 600;
+}
+.catalog-body > p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #606f77;
+  margin: 0 0 20px;
+  min-height: 40px;
+}
+.catalog-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 10px;
+  color: #5c717e;
+}
+.catalog-meta > span {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.catalog-tags {
+  margin: 17px 0 22px;
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.catalog-tags > span {
+  padding: 4px 7px;
+  color: #607179;
+  background: #f3f6f8;
+  border-radius: 4px;
+  font-size: 9px;
+}
+.catalog-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 18px;
+  border-top: 1px solid #edf1f3;
+}
+.catalog-card-footer .section-link {
+  font-size: 10px;
+}
+.catalog-card-footer .button {
+  font-size: 10px;
+}
+.detail-columns {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 24px;
+}
+.detail-card {
+  padding: 25px;
+  margin-bottom: 22px;
+}
+.detail-card h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 17px;
+}
+.detail-card p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #5a6d77;
+}
+.detail-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin: 20px 0;
+}
+.detail-info > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #5e727e;
+  font-size: 12px;
+}
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #dce6e9;
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+.settings-tabs button {
+  white-space: nowrap;
+}
+.crud-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 25px;
+  align-items: start;
+}
+.crud-list {
+  padding: 7px 20px;
+}
+.crud-list-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 0;
+  border-bottom: 1px solid #edf1f3;
+}
+.crud-list-item:last-child {
+  border: 0;
+}
+.crud-list-item strong {
+  font-size: 12px;
+  display: block;
+}
+.crud-list-item small {
+  font-size: 10px;
+  color: #5f6d75;
+  display: block;
+  margin-top: 5px;
+}
+.crud-list-item > div:last-child {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.crud-form {
+  padding: 24px;
+}
+.crud-form h2 {
+  font-size: 16px;
+  margin: 0 0 22px;
+  font-weight: 600;
+}
+.checkbox-label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 400;
+}
+.checkbox-label input {
+  accent-color: #087f67;
+  width: 15px;
+  height: 15px;
+}
+.form-message {
+  padding: 12px;
+  border-radius: 6px;
+  background: #eff6f2;
+  color: #2c7356;
+  font-size: 12px;
+}
+.form-message-error {
+  background: #fcefee;
+  color: #a33434;
+}
+@media (min-width: 1500px) {
+  .catalog-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 1200px) {
+  .catalog-filters {
+    flex-wrap: wrap;
+  }
+  .catalog-search {
+    flex-basis: 100%;
+    padding: 6px 10px 12px;
+  }
+  .catalog-filters .input {
+    flex: 1;
+  }
+  .crud-layout {
+    grid-template-columns: 1fr;
+  }
+  .detail-columns {
+    grid-template-columns: 1fr 250px;
+  }
+}
+@media (max-width: 700px) {
+  .catalog-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .catalog-visual {
+    height: 125px;
+  }
+  .catalog-body {
+    padding: 20px;
+  }
+  .catalog-filters {
+    padding: 12px;
+    gap: 9px;
+  }
+  .catalog-filters .input {
+    min-width: 110px;
+  }
+  .catalog-caption > span:last-child {
+    display: none;
+  }
+  .detail-columns {
+    grid-template-columns: 1fr;
+  }
+  .detail-info {
+    flex-wrap: wrap;
+  }
+  .crud-form {
+    padding: 20px;
+  }
+  .detail-card {
+    padding: 20px;
+  }
+  .catalog-meta {
+    gap: 15px;
+    font-size: 9px;
+  }
+}

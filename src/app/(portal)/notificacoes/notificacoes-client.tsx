@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import {
   Bell,
   CheckCheck,
@@ -98,6 +98,7 @@ export function NotificacoesClient({
                   {!item.lida_em && (
                     <span
                       className="notification-unread-dot"
+                      role="img"
                       aria-label="Não lida"
                     />
                   )}

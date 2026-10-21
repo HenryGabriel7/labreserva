@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { PageHeading, Pagination } from "@/components/shared";
 import { getContexto, getLaboratorios } from "@/lib/data";
 import { requireUser } from "@/lib/auth";

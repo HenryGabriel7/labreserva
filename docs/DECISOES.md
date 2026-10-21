@@ -11,3 +11,10 @@
 - Recorrência respeita o limite de meses e também a antecedência máxima por ocorrência, valendo o mais restritivo. Configurações padrão permitem 90 dias dentro do limite máximo de 6 meses.
 - Tentativas inválidas fazem rollback da transação RPC: o rate limit do endpoint de solicitação é consumido em uma requisição de serviço separada antes da RPC autenticada; há defesa adicional dentro da RPC.
 - Validação auxiliar com PostgreSQL WASM é reproduzível; adapters Supabase externos são declarados. `supabase test db` continua obrigatório no CI com serviços reais.
+- 2026-10-21: provisionar_usuario exige ator administrador e não pode criar o primeiro. A operação excepcional inicializar_administrador é service-only, tem lock global e recusa qualquer novo bootstrap se houver papel admin, mesmo inativo. A CLI gera o convite e enfileira a entrega sem imprimir credenciais; depois, o fluxo normal é obrigatório.
+- RLS/RPC também verificam session_id em auth.sessions, usuário e not_after. Novas transações rejeitam a sessão removida; fixtures de teste mantêm sessões/claims explícitos, sem bypass na aplicação.
+- Eventos de autenticação são privados na fila por RLS da linha inteira. Filtrar somente no React deixaria links bearer acessíveis por REST e pelo snapshot renderizado.
+- CSP usa nonce por resposta e renderização dinâmica. Estilos inline são permitidos nos componentes; scripts de produção não permitem inline genérico ou eval.
+- E-mails congelam o envelope antes do envio para manter o mesmo conteúdo nos retries idempotentes. Aceite no Resend não é entrega; envio incerto perto do limite da janela exige reconciliação, sem reenvio automático.
+- Testes com chave de serviço são restritos a loopback. O ajuste de horário para check-in existe só em fixture QA e não cria caminho de teste no aplicativo. Ausência de serviços é skipped explícito local e erro no CI.
+- Retenção é uma política de referência a confirmar pela instituição, sem exclusão automática de evidências. Modo escuro permanece opcional, após os fluxos obrigatórios.

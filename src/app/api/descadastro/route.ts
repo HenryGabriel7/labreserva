@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verificarTokenDescadastro } from "@/lib/notificacoes";
 import {

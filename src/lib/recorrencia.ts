@@ -1,5 +1,41 @@
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { somarDias } from "./reservas";
-export function somarMesesCivil(data:string,meses:number){const [ano,mes,dia]=data.split("-").map(Number);const primeiro=new Date(Date.UTC(ano,mes-1+meses,1));const ultimo=new Date(Date.UTC(primeiro.getUTCFullYear(),primeiro.getUTCMonth()+1,0)).getUTCDate();primeiro.setUTCDate(Math.min(dia,ultimo));return primeiro.toISOString().slice(0,10);}
-const schema=z.object({dataInicio:z.iso.date(),dataFim:z.iso.date(),diaSemana:z.number().int().min(0).max(6),excecoes:z.array(z.iso.date()).default([]),feriados:z.array(z.iso.date()).default([]),maxMeses:z.number().int().min(1).max(24).default(6)}).strict();
-export function gerarDatasRecorrencia(entrada:z.input<typeof schema>){const v=schema.parse(entrada);if(v.dataFim<v.dataInicio||v.dataFim>somarMesesCivil(v.dataInicio,v.maxMeses))throw new Error("Período de recorrência inválido.");const datas:string[]=[],puladas:string[]=[];for(let d=v.dataInicio;d<=v.dataFim;d=somarDias(d,1)){if(new Date(`${d}T12:00:00Z`).getUTCDay()!==v.diaSemana||v.excecoes.includes(d))continue;if(v.feriados.includes(d))puladas.push(d);else datas.push(d);}return {datas,puladas};}
+export function somarMesesCivil(data: string, meses: number) {
+  const [ano, mes, dia] = data.split("-").map(Number);
+  const primeiro = new Date(Date.UTC(ano, mes - 1 + meses, 1));
+  const ultimo = new Date(
+    Date.UTC(primeiro.getUTCFullYear(), primeiro.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  primeiro.setUTCDate(Math.min(dia, ultimo));
+  return primeiro.toISOString().slice(0, 10);
+}
+const schema = z
+  .object({
+    dataInicio: z.iso.date(),
+    dataFim: z.iso.date(),
+    diaSemana: z.number().int().min(0).max(6),
+    excecoes: z.array(z.iso.date()).default([]),
+    feriados: z.array(z.iso.date()).default([]),
+    maxMeses: z.number().int().min(1).max(24).default(6),
+  })
+  .strict();
+export function gerarDatasRecorrencia(entrada: z.input<typeof schema>) {
+  const v = schema.parse(entrada);
+  if (
+    v.dataFim < v.dataInicio ||
+    v.dataFim > somarMesesCivil(v.dataInicio, v.maxMeses)
+  )
+    throw new Error("Período de recorrência inválido.");
+  const datas: string[] = [],
+    puladas: string[] = [];
+  for (let d = v.dataInicio; d <= v.dataFim; d = somarDias(d, 1)) {
+    if (
+      new Date(`${d}T12:00:00Z`).getUTCDay() !== v.diaSemana ||
+      v.excecoes.includes(d)
+    )
+      continue;
+    if (v.feriados.includes(d)) puladas.push(d);
+    else datas.push(d);
+  }
+  return { datas, puladas };
+}

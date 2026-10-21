@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   gap: 13px;
-  color: #087f67;
+  color: #077861;
 }
 .people-stat > div {
   display: flex;
@@ -22,7 +22,7 @@
 }
 .people-stat span {
   font-size: 11px;
-  color: #7b8c96;
+  color: #627178;
 }
 .people-name {
   display: flex;
@@ -37,7 +37,7 @@
 .people-name small {
   display: block;
   font-size: 11px;
-  color: #7b8b97;
+  color: #627079;
   margin-top: 5px;
 }
 .people-avatar {
@@ -96,7 +96,7 @@
 }
 .people-footnote {
   font-size: 11px;
-  color: #7b8b97;
+  color: #627079;
   display: flex;
   gap: 7px;
   align-items: center;
@@ -150,7 +150,7 @@
 }
 .profile-card p {
   font-size: 11px;
-  color: #78909c;
+  color: #5b6d77;
   overflow-wrap: anywhere;
 }
 .profile-meta {
@@ -163,7 +163,7 @@
 }
 .profile-meta dt {
   font-size: 10px;
-  color: #83929d;
+  color: #636f77;
   margin-bottom: 5px;
 }
 .profile-meta dd {
@@ -203,7 +203,7 @@
 .profile-option small {
   display: block;
   font-size: 11px;
-  color: #7a8b97;
+  color: #617079;
   line-height: 1.8;
 }
 .profile-security {
@@ -240,7 +240,7 @@
   height: 38px;
   border-radius: 10px;
   flex-shrink: 0;
-  color: #087f67;
+  color: #077861;
   background: #eaf5ef;
 }
 .notification-copy {
@@ -256,7 +256,7 @@
 }
 .notification-copy p {
   font-size: 12px;
-  color: #758793;
+  color: #5e6c76;
   line-height: 1.8;
   margin: 0;
 }
@@ -267,7 +267,7 @@
   align-items: center;
   flex-wrap: wrap;
   font-size: 10px;
-  color: #8b9ba5;
+  color: #647077;
 }
 .notification-unread {
   background: #fbfefd;

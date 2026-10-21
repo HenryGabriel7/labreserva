@@ -1,1 +1,14 @@
-export default function Loading(){return <div role="status" aria-label="Carregando conteúdo" className="loading-skeleton"><div/><div/><div/><span className="sr-only">Carregando informações…</span></div>;}
+export default function Loading() {
+  return (
+    <div
+      role="status"
+      aria-label="Carregando conteúdo"
+      className="loading-skeleton"
+    >
+      <div />
+      <div />
+      <div />
+      <span className="sr-only">Carregando informações…</span>
+    </div>
+  );
+}

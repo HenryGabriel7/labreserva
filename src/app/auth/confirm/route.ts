@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 

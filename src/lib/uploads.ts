@@ -1,4 +1,53 @@
 import { fileTypeFromBuffer } from "file-type";
-export const MAX_FOTO_BYTES=5*1024*1024;
-export async function identificarFoto(bytes:Uint8Array){if(!bytes.length||bytes.length>MAX_FOTO_BYTES)throw new Error("Cada foto deve ter até 5 MB.");let tipo;try{tipo=await fileTypeFromBuffer(bytes);}catch{throw new Error("O arquivo não é uma imagem válida.");}if(!tipo||!["image/jpeg","image/png","image/webp"].includes(tipo.mime))throw new Error("Use fotos JPEG, PNG ou WebP válidas.");return {mime:tipo.mime,extensao:tipo.mime==="image/jpeg"?"jpg":tipo.mime==="image/png"?"png":"webp"};}
-export async function lerCorpoLimitado(request:Request,limite=26*1024*1024){if(!request.body)throw new Error("Corpo vazio");const reader=request.body.getReader();const chunks:Uint8Array[]=[];let tamanho=0;try{while(true){const {value,done}=await reader.read();if(done)break;tamanho+=value.byteLength;if(tamanho>limite){await reader.cancel();throw new Error("Envio muito grande");}chunks.push(value);}}finally{reader.releaseLock();}const bytes=new Uint8Array(tamanho);let pos=0;for(const c of chunks){bytes.set(c,pos);pos+=c.length;}return bytes;}
+export const MAX_FOTO_BYTES = 5 * 1024 * 1024;
+export async function identificarFoto(bytes: Uint8Array) {
+  if (!bytes.length || bytes.length > MAX_FOTO_BYTES)
+    throw new Error("Cada foto deve ter até 5 MB.");
+  let tipo;
+  try {
+    tipo = await fileTypeFromBuffer(bytes);
+  } catch {
+    throw new Error("O arquivo não é uma imagem válida.");
+  }
+  if (!tipo || !["image/jpeg", "image/png", "image/webp"].includes(tipo.mime))
+    throw new Error("Use fotos JPEG, PNG ou WebP válidas.");
+  return {
+    mime: tipo.mime,
+    extensao:
+      tipo.mime === "image/jpeg"
+        ? "jpg"
+        : tipo.mime === "image/png"
+          ? "png"
+          : "webp",
+  };
+}
+export async function lerCorpoLimitado(
+  request: Request,
+  limite = 26 * 1024 * 1024,
+) {
+  if (!request.body) throw new Error("Corpo vazio");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let tamanho = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      tamanho += value.byteLength;
+      if (tamanho > limite) {
+        await reader.cancel();
+        throw new Error("Envio muito grande");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(tamanho);
+  let pos = 0;
+  for (const c of chunks) {
+    bytes.set(c, pos);
+    pos += c.length;
+  }
+  return bytes;
+}

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { z } from "@/lib/validacao";
 import {
   FileUp,
   Plus,
@@ -178,7 +178,12 @@ export function UsuariosClient({
             descricao="Adicione uma pessoa ou importe os usuários para enviar os primeiros convites."
           />
         ) : (
-          <div className="table-scroll">
+          <div
+            className="table-scroll"
+            tabIndex={0}
+            role="region"
+            aria-label="Lista de usuários, role horizontalmente para ver todas as colunas"
+          >
             <table className="data-table">
               <thead>
                 <tr>
@@ -521,7 +526,12 @@ function EditarUsuario({
             const response = await fetch("/api/usuarios", {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...dados, laboratorioIds: dados.papeis.includes("monitor") ? dados.laboratorioIds : [] }),
+              body: JSON.stringify({
+                ...dados,
+                laboratorioIds: dados.papeis.includes("monitor")
+                  ? dados.laboratorioIds
+                  : [],
+              }),
             });
             const resultado = (await response.json()) as Resultado;
             if (!response.ok) {

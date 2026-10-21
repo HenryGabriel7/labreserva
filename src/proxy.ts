@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { criarCsp } from "@/lib/security";
 
 const rotasPublicas = [
   "/login",
@@ -14,8 +15,24 @@ const rotasPublicas = [
 
 /** Renovação e redirecionamento otimistas; autorização é refeita em cada página e ação. */
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
-  response.headers.set("Cache-Control", "private, no-store");
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = criarCsp(
+    nonce,
+    process.env.NODE_ENV === "development",
+    process.env.SUPABASE_URL,
+  );
+  const cabecalhos = new Headers(request.headers);
+  cabecalhos.set("x-nonce", nonce);
+  cabecalhos.set("Content-Security-Policy", csp);
+  function proximaResposta() {
+    const cookie = request.headers.get("cookie");
+    if (cookie) cabecalhos.set("cookie", cookie);
+    const resultado = NextResponse.next({ request: { headers: cabecalhos } });
+    resultado.headers.set("Content-Security-Policy", csp);
+    resultado.headers.set("Cache-Control", "private, no-store");
+    return resultado;
+  }
+  let response = proximaResposta();
   const url = process.env.SUPABASE_URL;
   const chave = process.env.SUPABASE_PUBLISHABLE_KEY;
   if (!url || !chave) return response;
@@ -30,7 +47,7 @@ export async function proxy(request: NextRequest) {
       setAll(cookiesToSet, cacheHeaders) {
         for (const { name, value } of cookiesToSet)
           request.cookies.set(name, value);
-        response = NextResponse.next({ request });
+        response = proximaResposta();
         for (const { name, value, options } of cookiesToSet)
           response.cookies.set(name, value, {
             ...options,
@@ -53,6 +70,7 @@ export async function proxy(request: NextRequest) {
     destino.pathname = "/login";
     destino.search = "";
     const redirect = NextResponse.redirect(destino);
+    redirect.headers.set("Content-Security-Policy", csp);
     for (const cookie of response.cookies.getAll())
       redirect.cookies.set(cookie);
     for (const nome of ["cache-control", "expires", "pragma"]) {
