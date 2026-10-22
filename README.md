@@ -1,5 +1,7 @@
 # LabReserva
 
+Aplicação publicada em [labreserva.vercel.app](https://labreserva.vercel.app), com banco Supabase. Estado da implantação, primeiro acesso administrativo e configuração pendente de e-mail: [DEPLOY](docs/DEPLOY.md).
+
 Sistema institucional de reserva de laboratórios em português, com Next.js 16 App Router, TypeScript strict, Tailwind/shadcn, React Hook Form, Zod e Supabase. O banco controla autorização, concorrência, prioridade, substituição, recorrência e auditoria. E-mails saem por uma fila transacional, com Edge Function e Resend.
 
 Inclui catálogo e disponibilidade, solicitações e histórico, painel do monitor, check-in/out, ocorrências com fotos, cadastros, usuários/CSV, configurações, relatórios CSV/PDF e exportação de dados pessoais. Horários em `America/Sao_Paulo`; banco em UTC.

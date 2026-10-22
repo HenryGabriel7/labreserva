@@ -66,7 +66,7 @@ O workflow executa lint, tipos, unidade, check/test Deno, Supabase/Docker, reset
 
 Os relatórios de navegador incluem somente o ambiente local de QA e ficam como artefato por sete dias. Traces dos fluxos autenticados ficam desligados para reduzir a retenção de links de convite nos artefatos. A validação automática de acessibilidade complementa a revisão manual de teclado e leitores de tela.
 
-## Registro desta execução
+## Histórico de verificação
 
 - Em 21/10/2026, Chromium executou os 46 casos de demonstração sobre o build de produção: **46 passaram**, em aproximadamente 1,2 minuto.
 - As 20 rotas passaram nas regras axe WCAG 2 A/AA e 2.1 AA, nos dois tamanhos, sem supressão de regras e sem overflow horizontal a 360 px. Isso não equivale a uma certificação completa de acessibilidade.
@@ -74,3 +74,11 @@ Os relatórios de navegador incluem somente o ambiente local de QA e ficam como 
 - A execução de integração marcou os **cinco testes como skipped**, explicitamente pela ausência do Supabase local. Os **quatro casos E2E autenticados** permanecem não executados neste computador.
 - Supabase real, pgTAP nativo, concorrência HTTP, revogação no GoTrue/PostgREST, cron e entrega de e-mail não foram validados neste computador sem Docker/Supabase local. As camadas de banco, integração e E2E autenticado permanecem obrigatórias no CI; entrega real de e-mail exige a configuração descrita em `EMAIL.md`.
 - Na primeira [execução remota do CI](https://github.com/HenryGabriel7/labreserva/actions/runs/39661076622), as 204 asserções pgTAP passaram no Supabase real do runner. A integração teve um teste aprovado e quatro falhas com `Email logins are disabled`, interrompendo as etapas posteriores. A configuração do provider Email foi corrigida; o resultado da nova execução deve ser conferido antes do deploy.
+
+## CI e produção — 22/10/2026
+
+O [run 39832599914](https://github.com/HenryGabriel7/labreserva/actions/runs/39832599914), commit `558f554`, concluiu com sucesso: lint, tipos, 79 testes unitários em 14 arquivos, 216 asserções pgTAP nativas em nove arquivos, cinco integrações HTTP/Auth, Deno (um teste/quatro passos), build, npm audit e **50/50 E2E**. Os quatro fluxos autenticados passaram juntamente com os 46 casos de demonstração. A correção final ficou restrita à origem TLS dos redirects no proxy de QA; a aplicação de produção manteve sua exigência de HTTPS.
+
+No site publicado, foram conferidos login e privacidade HTTP 200, ausência do modo de demonstração, redirecionamento da área interna para login, API administrativa HTTP 401 sem sessão, redirect de confirmação inválida na origem HTTPS correta e ausência de erros JavaScript. O Auth hospedado confirmou provider Email ativo e signup bloqueado; o acesso anônimo aos laboratórios e ao worker foi recusado.
+
+Um teste do transporte de Storage usou uma imagem sintética de um pixel em um path UUID temporário no bucket privado: o Chromium enviou os bytes pela autorização assinada a partir da origem de produção, o download administrativo preservou o conteúdo, a leitura pública foi negada e o objeto foi removido pelo SDK. Isso comprova CORS/transporte e privacidade do bucket, sem consumir o convite do administrador ou criar reservas fictícias. A entrega real de e-mail permanece pendente pela ausência de Resend, e a revisão completa de ocorrências com fotos continua descrita em DEPLOY.md.
