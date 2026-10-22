@@ -105,12 +105,28 @@ export async function iniciarServidorE2e() {
             ...requisicao.headers,
             host: "127.0.0.1:3100",
             "x-forwarded-host": "127.0.0.1:3100",
+            "x-forwarded-port": "3100",
             "x-forwarded-proto": "https",
             "x-forwarded-for": host,
           },
         },
         (retorno) => {
-          resposta.writeHead(retorno.statusCode ?? 502, retorno.headers);
+          const cabecalhos = { ...retorno.headers };
+          if (cabecalhos.location) {
+            // Next pode construir redirects absolutos com a porta de escuta
+            // interna. O navegador deve continuar na origem TLS do proxy.
+            const destino = new URL(cabecalhos.location, origem);
+            if (
+              ["http:", "https:"].includes(destino.protocol) &&
+              [host, "localhost", "[::1]"].includes(destino.hostname) &&
+              destino.port === String(portaNext)
+            )
+              cabecalhos.location = new URL(
+                `${destino.pathname}${destino.search}${destino.hash}`,
+                origem,
+              ).href;
+          }
+          resposta.writeHead(retorno.statusCode ?? 502, cabecalhos);
           retorno.pipe(resposta);
         },
       );
