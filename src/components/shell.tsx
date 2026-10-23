@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
   FlaskConical,
@@ -12,17 +12,15 @@ import {
   ChartNoAxesCombined,
   Settings2,
   ShieldCheck,
-  Bell,
-  Search,
-  ChevronDown,
   PanelLeftClose,
   Menu,
   X,
   CircleHelp,
   ArrowUpRight,
-  GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ResumoNotificacao } from "@/lib/notificacoes/resumo";
+import { HeaderActions } from "./header-actions";
 import "./shell.css";
 
 const links = [
@@ -93,38 +91,95 @@ export function Shell({
   roles = [],
   demonstracao = false,
   pendentes = 0,
+  notificacoes = [],
+  notificacoesIndisponiveis = false,
 }: {
   children: React.ReactNode;
   nome?: string;
   roles?: string[];
   demonstracao?: boolean;
   pendentes?: number;
+  notificacoes?: ResumoNotificacao[];
+  notificacoesIndisponiveis?: boolean;
 }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  const sidebar = useRef<HTMLElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 800px)");
+    const aoRedimensionar = () => {
+      if (!media.matches) setOpen(false);
+    };
+    media.addEventListener("change", aoRedimensionar);
+    return () => media.removeEventListener("change", aoRedimensionar);
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    sidebar.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const aoTeclar = (evento: KeyboardEvent) => {
+      if (evento.key === "Escape") {
+        setOpen(false);
+        requestAnimationFrame(() => menuButton.current?.focus());
+      }
+      if (evento.key !== "Tab") return;
+      const itens = Array.from(
+        sidebar.current?.querySelectorAll<HTMLElement>("a, button") ?? [],
+      );
+      const primeiro = itens[0];
+      const ultimo = itens[itens.length - 1];
+      if (evento.shiftKey && document.activeElement === primeiro) {
+        evento.preventDefault();
+        ultimo?.focus();
+      } else if (!evento.shiftKey && document.activeElement === ultimo) {
+        evento.preventDefault();
+        primeiro?.focus();
+      }
+    };
+    document.addEventListener("keydown", aoTeclar);
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", aoTeclar);
+    };
+  }, [open]);
   const active = (href: string) =>
     href === "/" ? path === href : path.startsWith(href);
   const visible = links.filter(
     (l) => !l.roles || demonstracao || l.roles.some((r) => roles.includes(r)),
   );
-  const initials = nome
-    .split(" ")
-    .slice(0, 2)
-    .map((s) => s[0])
-    .join("");
   return (
     <div className="app-shell">
       {open && (
         <button
           className="sidebar-overlay"
           aria-label="Fechar menu"
-          onClick={() => setOpen(false)}
+          onClick={() => {
+            setOpen(false);
+            requestAnimationFrame(() => menuButton.current?.focus());
+          }}
         />
       )}
       <aside
+        ref={sidebar}
+        id="menu-principal"
         className={cn("sidebar", open && "sidebar-open")}
         aria-label="Menu principal"
+        role={open ? "dialog" : "complementary"}
+        aria-modal={open ? true : undefined}
       >
+        <button
+          type="button"
+          className="sidebar-close"
+          aria-label="Fechar menu principal"
+          onClick={() => {
+            setOpen(false);
+            requestAnimationFrame(() => menuButton.current?.focus());
+          }}
+        >
+          <X size={20} aria-hidden="true" />
+        </button>
         <Link href="/" className="brand">
           <span className="brand-icon">
             <FlaskConical size={22} />
@@ -134,16 +189,6 @@ export function Shell({
             <small>GESTÃO DE LABORATÓRIOS</small>
           </span>
         </Link>
-        <div className="institution">
-          <span className="institution-icon">
-            <GraduationCap size={19} />
-          </span>
-          <div>
-            <strong>Portal acadêmico</strong>
-            <small>Campus principal</small>
-          </div>
-          <ChevronDown size={14} />
-        </div>
         <nav>
           <p className="nav-heading">ESPAÇO DE TRABALHO</p>
           {visible
@@ -197,14 +242,17 @@ export function Shell({
           </Link>
         </div>
       </aside>
-      <div className="main-shell">
+      <div className="main-shell" inert={open ? true : undefined}>
         <header className="topbar">
           <div className="topbar-left">
             <button
+              ref={menuButton}
+              type="button"
               className="mobile-menu button button-ghost button-icon"
               onClick={() => setOpen(!open)}
               aria-label={open ? "Fechar menu" : "Abrir menu"}
               aria-expanded={open}
+              aria-controls="menu-principal"
             >
               {open ? <X size={21} /> : <Menu size={21} />}
             </button>
@@ -216,44 +264,13 @@ export function Shell({
             </div>
           </div>
           <div className="topbar-right">
-            <form className="global-search" action="/laboratorios">
-              <Search size={16} />
-              <input
-                name="q"
-                aria-label="Buscar laboratórios"
-                placeholder="Buscar laboratórios..."
-              />
-              <kbd>⌕</kbd>
-            </form>
-            <Link
-              href="/notificacoes"
-              className="notification-icon"
-              aria-label="Central de notificações"
-            >
-              <Bell size={19} />
-            </Link>
-            <span className="topbar-divider" />
-            <Link
-              href={demonstracao ? "/login" : "/perfil"}
-              className="profile-menu"
-            >
-              <span className="avatar">{demonstracao ? "LR" : initials}</span>
-              <span>
-                <strong>{nome}</strong>
-                <small>
-                  {demonstracao
-                    ? "Demonstração"
-                    : roles.includes("admin")
-                      ? "Administrador"
-                      : roles.includes("monitor")
-                        ? "Monitor"
-                        : roles.includes("professor")
-                          ? "Professor"
-                          : "Comunidade acadêmica"}
-                </small>
-              </span>
-              <ChevronDown size={14} />
-            </Link>
+            <HeaderActions
+              nome={nome}
+              roles={roles}
+              demonstracao={demonstracao}
+              notificacoes={notificacoes}
+              notificacoesIndisponiveis={notificacoesIndisponiveis}
+            />
           </div>
         </header>
         {demonstracao && (
@@ -281,7 +298,11 @@ export function Shell({
           </span>
         </footer>
       </div>
-      <nav className="bottom-nav" aria-label="Navegação rápida">
+      <nav
+        className="bottom-nav"
+        aria-label="Navegação rápida"
+        inert={open ? true : undefined}
+      >
         {visible.slice(0, 4).map((l) => (
           <Link
             key={l.href}

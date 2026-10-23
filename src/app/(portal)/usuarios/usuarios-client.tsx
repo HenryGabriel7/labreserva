@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, type UseFormRegisterReturn } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "@/lib/validacao";
 import {
@@ -46,23 +46,35 @@ type Resultado = {
   success?: boolean;
 };
 
-function PapeisCheckbox({
-  registro,
+function PapelSelect({
+  valor,
+  selecionar,
+  invalido,
 }: {
-  registro: UseFormRegisterReturn<"papeis">;
+  valor: Papel | "";
+  selecionar: (papel: Papel) => void;
+  invalido: boolean;
 }) {
   return (
-    <fieldset className="people-fieldset">
-      <legend>Papéis de acesso</legend>
-      <div className="people-checkbox-grid">
+    <label>
+      Papel de acesso
+      <select
+        className="input"
+        value={valor}
+        aria-invalid={invalido}
+        onChange={(evento) => selecionar(evento.target.value as Papel)}
+      >
+        <option value="" disabled>
+          Selecione um papel
+        </option>
         {papeis.map((papel) => (
-          <label key={papel} className="people-checkbox">
-            <input type="checkbox" value={papel} {...registro} />
+          <option key={papel} value={papel}>
             {nomesPapel[papel]}
-          </label>
+          </option>
         ))}
-      </div>
-    </fieldset>
+      </select>
+      <span className="muted">Cada conta possui um único papel de acesso.</span>
+    </label>
   );
 }
 
@@ -267,11 +279,14 @@ function CriarUsuario({ concluir }: { concluir: (texto: string) => void }) {
   const {
     register,
     handleSubmit,
+    control,
+    setValue,
     formState: { errors },
   } = useForm<z.infer<typeof conviteSchema>>({
     resolver: zodResolver(conviteSchema),
     defaultValues: { nome: "", email: "", matricula: "", papeis: ["aluno"] },
   });
+  const papel = useWatch({ control, name: "papeis" })[0] ?? "";
   const enviar = handleSubmit((dados) =>
     transicao(async () => {
       setErro("");
@@ -320,7 +335,7 @@ function CriarUsuario({ concluir }: { concluir: (texto: string) => void }) {
           />
           {errors.nome && (
             <span className="field-error">
-              Informe um nome com 2 a 160 caracteres.
+              Informe um nome com 2 a 150 caracteres.
             </span>
           )}
         </label>
@@ -342,10 +357,16 @@ function CriarUsuario({ concluir }: { concluir: (texto: string) => void }) {
           <input className="input" {...register("matricula")} maxLength={80} />
         </label>
       </div>
-      <PapeisCheckbox registro={register("papeis")} />
+      <PapelSelect
+        valor={papel}
+        selecionar={(papel) =>
+          setValue("papeis", [papel], { shouldValidate: true })
+        }
+        invalido={!!errors.papeis}
+      />
       {errors.papeis && (
         <p role="alert" className="field-error">
-          Selecione pelo menos um papel.
+          Selecione somente um papel de acesso.
         </p>
       )}
       <div>
@@ -420,8 +441,8 @@ function ImportarUsuarios({ concluir }: { concluir: (texto: string) => void }) {
     >
       <p className="page-subtitle">
         Até 100 pessoas por arquivo. Use os campos{" "}
-        <strong>nome,email,matricula,papeis</strong>. Separe papéis acumulados
-        com uma barra vertical, por exemplo: aluno|monitor.
+        <strong>nome,email,matricula,papeis</strong>. Informe um único papel por
+        pessoa: aluno, professor, funcionario, monitor ou admin.
       </p>
       <label>
         Selecionar arquivo CSV
@@ -498,6 +519,8 @@ function EditarUsuario({
   const {
     register,
     handleSubmit,
+    control,
+    setValue,
     formState: { errors },
   } = useForm<
     z.input<typeof alterarUsuarioSchema>,
@@ -510,10 +533,11 @@ function EditarUsuario({
       nome: usuario.nome,
       matricula: usuario.matricula ?? "",
       ativo: usuario.ativo,
-      papeis: usuario.papeis,
+      papeis: usuario.papeis.length === 1 ? usuario.papeis : [],
       laboratorioIds: usuario.laboratorioIds,
     },
   });
+  const papel = useWatch({ control, name: "papeis" })[0] ?? "";
   return (
     <form
       className="form-stack"
@@ -571,9 +595,15 @@ function EditarUsuario({
         </label>
       </div>
       <p className="page-subtitle">E-mail: {usuario.email}</p>
-      <PapeisCheckbox registro={register("papeis")} />
+      <PapelSelect
+        valor={papel}
+        selecionar={(papel) =>
+          setValue("papeis", [papel], { shouldValidate: true })
+        }
+        invalido={!!errors.papeis}
+      />
       {errors.papeis && (
-        <p className="field-error">Selecione pelo menos um papel.</p>
+        <p className="field-error">Selecione somente um papel de acesso.</p>
       )}
       <fieldset className="people-fieldset">
         <legend>Laboratórios acompanhados como monitor</legend>

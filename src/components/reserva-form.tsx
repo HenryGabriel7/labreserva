@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   CalendarDays,
   Info,
+  CircleCheck,
+  TriangleAlert,
 } from "lucide-react";
 import {
   reservaFormularioSchema,
@@ -19,7 +21,12 @@ import {
 import { solicitarReservaAction } from "@/lib/actions-reservas";
 import type { Laboratorio, Equipamento, JanelaHorario } from "@/lib/types";
 import { gerarDatasRecorrencia } from "@/lib/recorrencia";
-import { horariosSlots } from "@/lib/reservas";
+import {
+  horariosSlots,
+  janelasDoDia,
+  validarHorarioReserva,
+  type PoliticaAntecedencia,
+} from "@/lib/reservas";
 export function ReservaForm({
   laboratorios,
   equipamentos,
@@ -30,6 +37,7 @@ export function ReservaForm({
   horaFimInicial,
   demonstracao,
   prioridade,
+  politica,
 }: {
   laboratorios: Laboratorio[];
   equipamentos: Equipamento[];
@@ -40,23 +48,32 @@ export function ReservaForm({
   horaFimInicial?: string;
   demonstracao: boolean;
   prioridade: boolean;
+  politica: PoliticaAntecedencia;
 }) {
   const router = useRouter();
   const [mensagem, setMensagem] = useState("");
+  const [sucesso, setSucesso] = useState<string | null>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const erroResumo = useRef<HTMLDivElement>(null);
+  const focarResumo = useRef(false);
   const [pending, startTransition] = useTransition();
   const hoje = formatInTimeZone(new Date(), "America/Sao_Paulo", "yyyy-MM-dd");
   const {
     register,
     handleSubmit,
     control,
+    setError,
+    clearErrors,
+    setFocus,
+    reset,
     formState: { errors },
   } = useForm<ReservaFormulario>({
     resolver: zodResolver(reservaFormularioSchema),
     defaultValues: {
-      laboratorioId: labInicial ?? laboratorios[0]?.id ?? "",
+      laboratorioId: labInicial ?? laboratorios.find((l) => l.ativo)?.id ?? "",
       data: dataInicial ?? hoje,
-      horaInicio: horaInicioInicial ?? "14:00",
-      horaFim: horaFimInicial ?? "16:00",
+      horaInicio: horaInicioInicial ?? "",
+      horaFim: horaFimInicial ?? "",
       escopo: "laboratorio",
       finalidade: "",
       nParticipantes: 1,
@@ -67,6 +84,15 @@ export function ReservaForm({
       excecoes: "",
     },
   });
+  useEffect(() => {
+    if (sucesso && !dialog.current?.open) dialog.current?.showModal();
+  }, [sucesso]);
+  useEffect(() => {
+    if (mensagem && focarResumo.current) {
+      erroResumo.current?.focus();
+      focarResumo.current = false;
+    }
+  }, [mensagem]);
   const { fields, append, remove } = useFieldArray({
     control,
     name: "equipamentos",
@@ -76,6 +102,7 @@ export function ReservaForm({
   const repetir = useWatch({ control, name: "repetir" });
   const dataFim = useWatch({ control, name: "dataFim" });
   const excecoes = useWatch({ control, name: "excecoes" });
+  const escopo = useWatch({ control, name: "escopo" });
   let previstas = 0;
   try {
     if (repetir && dataFim)
@@ -91,26 +118,87 @@ export function ReservaForm({
   } catch {}
   const lab = laboratorios.find((l) => l.id === labId);
   const disponiveis = equipamentos.filter(
-    (e) => e.laboratorio_id === labId && e.status === "ativo",
+    (e) =>
+      e.laboratorio_id === labId &&
+      e.status === "ativo" &&
+      (escopo !== "equipamentos" || e.reservavel_individualmente),
   );
-  const janela = janelas.find(
-    (j) =>
-      j.laboratorio_id === labId &&
-      j.dia_semana === new Date(`${data}T12:00:00Z`).getUTCDay(),
+  const funcionamento = janelasDoDia(janelas, labId, data);
+  const semFuncionamento = Boolean(
+    lab && !janelas.some((j) => j.laboratorio_id === lab.id),
   );
-  const slots = janela
-    ? horariosSlots(
-        janela.inicio,
-        janela.fim,
-        lab?.modo_reserva === "slot_fixo"
-          ? janela.duracao_slot_minutos
-          : (lab?.granularidade_minutos ?? 15),
-      )
-    : [];
+  const slots = [
+    ...new Set(
+      funcionamento.flatMap((janela) =>
+        horariosSlots(
+          janela.inicio,
+          janela.fim,
+          lab?.modo_reserva === "slot_fixo"
+            ? janela.duracao_slot_minutos
+            : (lab?.granularidade_minutos ?? 15),
+        ),
+      ),
+    ),
+  ];
+  const equipamentosSelecionados = useWatch({ control, name: "equipamentos" });
+  const proximoEquipamento = disponiveis.find(
+    (e) =>
+      !equipamentosSelecionados.some((item) => item.equipamentoId === e.id),
+  );
+  function novoAgendamento() {
+    dialog.current?.close();
+    setSucesso(null);
+    setMensagem("");
+    reset();
+    requestAnimationFrame(() => setFocus("laboratorioId"));
+  }
   function submit(v: ReservaFormulario) {
+    if (pending || sucesso) return;
+    setMensagem("");
+    clearErrors();
     if (demonstracao) {
       setMensagem(
         "Entre com sua conta institucional para enviar uma solicitação.",
+      );
+      return;
+    }
+    const falhas = validarHorarioReserva({
+      laboratorio: lab,
+      janelas,
+      data: v.data,
+      horaInicio: v.horaInicio,
+      horaFim: v.horaFim,
+      politica,
+    });
+    if (lab && v.nParticipantes > lab.capacidade)
+      falhas.push({
+        campo: "nParticipantes",
+        mensagem: `Este laboratório comporta até ${lab.capacidade} pessoas. Reduza a quantidade de participantes.`,
+      });
+    const itemInvalido = v.equipamentos.find((item) => {
+      const equipamento = disponiveis.find((e) => e.id === item.equipamentoId);
+      return !equipamento || item.quantidade > equipamento.quantidade;
+    });
+    if (itemInvalido)
+      falhas.push({
+        campo: "equipamentos",
+        mensagem:
+          "Confira os itens e as quantidades. Use somente equipamentos disponíveis deste laboratório e até o estoque informado.",
+      });
+    if (falhas.length) {
+      falhas.forEach((falha, indice) =>
+        setError(
+          falha.campo,
+          { type: "validate", message: falha.mensagem },
+          { shouldFocus: indice === 0 },
+        ),
+      );
+      if (falhas[0].campo === "equipamentos") {
+        if (fields.length) setFocus("equipamentos.0.equipamentoId");
+        else focarResumo.current = true;
+      }
+      setMensagem(
+        "Não foi possível enviar. Corrija os campos indicados abaixo.",
       );
       return;
     }
@@ -149,25 +237,63 @@ export function ReservaForm({
             "America/Sao_Paulo",
           ).toISOString(),
         });
-        setMensagem(r.mensagem);
         if (r.ok) {
           const ids = (r.dados as { reserva_ids?: string[] })?.reserva_ids;
           if (repetir) {
             const puladas =
               (r.dados as { datas_puladas?: string[] }).datas_puladas ?? [];
-            setMensagem(
+            setSucesso(
               `${ids?.length ?? 0} solicitações criadas. Datas puladas por feriado: ${puladas.length ? puladas.join(", ") : "nenhuma"}. Acompanhe a série em Minhas reservas.`,
             );
-          } else router.push(ids?.[0] ? `/reservas/${ids[0]}` : "/reservas");
+          } else
+            setSucesso(
+              "Você será avisado quando houver uma decisão. Acompanhe o andamento em Minhas reservas.",
+            );
+        } else {
+          if (r.campo) {
+            setError(
+              r.campo,
+              { type: "server", message: r.mensagem },
+              { shouldFocus: true },
+            );
+            if (r.campo === "equipamentos") {
+              if (fields.length) setFocus("equipamentos.0.equipamentoId");
+              else focarResumo.current = true;
+            }
+          } else focarResumo.current = true;
+          setMensagem(r.mensagem);
         }
       } catch {
+        focarResumo.current = true;
         setMensagem("Não foi possível enviar. Tente novamente.");
       }
     });
   }
   return (
     <div className="reservation-form-layout">
-      <form className="panel reservation-form" onSubmit={handleSubmit(submit)}>
+      <form
+        noValidate
+        className="panel reservation-form"
+        onSubmit={(event) =>
+          void handleSubmit(submit, (falhas) => {
+            if (falhas.equipamentos && !fields.length)
+              focarResumo.current = true;
+            setMensagem(
+              "Corrija os campos indicados antes de enviar a solicitação.",
+            );
+          })(event)
+        }
+      >
+        <div
+          className="reservation-error-summary"
+          role="alert"
+          tabIndex={-1}
+          ref={erroResumo}
+          hidden={!mensagem}
+        >
+          <TriangleAlert size={18} aria-hidden="true" />
+          <span>{mensagem}</span>
+        </div>
         <div className="form-section-title">
           <span>01</span>
           <div>
@@ -180,8 +306,21 @@ export function ReservaForm({
             Laboratório
             <select
               className="input"
-              {...register("laboratorioId", { onChange: () => remove() })}
+              aria-invalid={Boolean(errors.laboratorioId)}
+              aria-describedby={
+                errors.laboratorioId ? "erro-laboratorio" : undefined
+              }
+              {...register("laboratorioId", {
+                onChange: () => {
+                  remove();
+                  clearErrors();
+                  setMensagem("");
+                },
+              })}
             >
+              {!laboratorios.some((l) => l.ativo) && (
+                <option value="">Nenhum laboratório disponível</option>
+              )}
               {laboratorios
                 .filter((l) => l.ativo)
                 .map((l) => (
@@ -190,22 +329,37 @@ export function ReservaForm({
                   </option>
                 ))}
             </select>
+            {errors.laboratorioId && (
+              <span className="field-error" id="erro-laboratorio">
+                {errors.laboratorioId.message}
+              </span>
+            )}
           </label>
           <label>
             Data
             <input
               type="date"
+              aria-label="Data"
               min={hoje}
               className="input"
+              aria-invalid={Boolean(errors.data)}
+              aria-describedby={
+                errors.data ? "erro-data" : "funcionamento-reserva"
+              }
               {...register("data")}
             />
             {errors.data && (
-              <span className="field-error">Selecione uma data válida.</span>
+              <span className="field-error" id="erro-data">
+                {errors.data.message}
+              </span>
             )}
           </label>
           <label>
             O que você precisa?
-            <select className="input" {...register("escopo")}>
+            <select
+              className="input"
+              {...register("escopo", { onChange: () => remove() })}
+            >
               <option value="laboratorio">Laboratório completo</option>
               <option value="equipamentos">Apenas equipamentos</option>
             </select>
@@ -214,23 +368,44 @@ export function ReservaForm({
             Horário de início
             <input
               type="time"
+              aria-label="Horário de início"
               className="input"
               list="slots-disponiveis"
-              step={(lab?.granularidade_minutos ?? 15) * 60}
+              step={60}
+              aria-invalid={Boolean(errors.horaInicio)}
+              aria-describedby={
+                errors.horaInicio
+                  ? "erro-inicio funcionamento-reserva"
+                  : "funcionamento-reserva"
+              }
               {...register("horaInicio")}
             />
+            {errors.horaInicio && (
+              <span className="field-error" id="erro-inicio">
+                {errors.horaInicio.message}
+              </span>
+            )}
           </label>
           <label>
             Horário de término
             <input
               type="time"
+              aria-label="Horário de término"
               className="input"
               list="slots-disponiveis"
-              step={(lab?.granularidade_minutos ?? 15) * 60}
+              step={60}
+              aria-invalid={Boolean(errors.horaFim)}
+              aria-describedby={
+                errors.horaFim
+                  ? "erro-fim funcionamento-reserva"
+                  : "funcionamento-reserva"
+              }
               {...register("horaFim")}
             />
             {errors.horaFim && (
-              <span className="field-error">{errors.horaFim.message}</span>
+              <span className="field-error" id="erro-fim">
+                {errors.horaFim.message}
+              </span>
             )}
           </label>
         </div>
@@ -239,12 +414,27 @@ export function ReservaForm({
             <option key={s} value={s} />
           ))}
         </datalist>
-        <p className="form-hint">
+        <p className="form-hint" id="funcionamento-reserva">
           <CalendarDays size={13} />
-          {janela
-            ? `Funcionamento: ${janela.inicio.slice(0, 5)} às ${janela.fim.slice(0, 5)} · ${lab?.modo_reserva === "slot_fixo" ? `slots de ${janela.duracao_slot_minutos} minutos` : `intervalos de ${lab?.granularidade_minutos} minutos`}`
+          {funcionamento.length
+            ? `Funcionamento: ${funcionamento.map((j) => `${j.inicio.slice(0, 5)} às ${j.fim.slice(0, 5)}${lab?.modo_reserva === "slot_fixo" ? ` (slots de ${j.duracao_slot_minutos} minutos)` : ""}`).join("; ")}${lab?.modo_reserva === "intervalo_livre" ? ` · intervalos de ${lab.granularidade_minutos} minutos` : ""}. Duração: ${lab?.duracao_minima_minutos} a ${lab?.duracao_maxima_minutos} minutos.`
             : "Sem funcionamento cadastrado para este dia."}
         </p>
+        <p className="form-hint">
+          Antecedência: pelo menos {politica.antecedenciaMinHoras} hora(s) e até{" "}
+          {politica.antecedenciaMaxDias} dias.
+        </p>
+        {semFuncionamento && (
+          <div className="reservation-error-summary" role="alert">
+            <TriangleAlert size={18} aria-hidden="true" />
+            <span>
+              Este laboratório ainda não tem horários de funcionamento
+              cadastrados. A administração precisa cadastrá-los antes de receber
+              solicitações.{" "}
+              <a href={`/laboratorios/${labId}`}>Ver laboratório</a>.
+            </span>
+          </div>
+        )}
         <div className="form-divider" />
         <div className="form-section-title">
           <span>02</span>
@@ -259,25 +449,37 @@ export function ReservaForm({
             <textarea
               className="input"
               placeholder="Ex.: Aula prática de programação para a turma de Engenharia..."
+              aria-label="Finalidade da reserva"
               maxLength={2000}
+              aria-invalid={Boolean(errors.finalidade)}
+              aria-describedby={
+                errors.finalidade ? "erro-finalidade" : undefined
+              }
               {...register("finalidade")}
             />
             {errors.finalidade && (
-              <span className="field-error">{errors.finalidade.message}</span>
+              <span className="field-error" id="erro-finalidade">
+                {errors.finalidade.message}
+              </span>
             )}
           </label>
           <label>
             Número de participantes
             <input
               type="number"
+              aria-label="Número de participantes"
               min={1}
               max={lab?.capacidade ?? 10000}
               className="input"
+              aria-invalid={Boolean(errors.nParticipantes)}
+              aria-describedby={
+                errors.nParticipantes ? "erro-participantes" : undefined
+              }
               {...register("nParticipantes", { valueAsNumber: true })}
             />
             {errors.nParticipantes && (
-              <span className="field-error">
-                Confira a quantidade de participantes.
+              <span className="field-error" id="erro-participantes">
+                {errors.nParticipantes.message}
               </span>
             )}
           </label>
@@ -288,8 +490,17 @@ export function ReservaForm({
               <textarea
                 className="input"
                 placeholder="Descreva a necessidade acadêmica ou institucional."
+                aria-invalid={Boolean(errors.justificativaPrioridade)}
+                aria-describedby={
+                  errors.justificativaPrioridade ? "erro-prioridade" : undefined
+                }
                 {...register("justificativaPrioridade")}
               />
+              {errors.justificativaPrioridade && (
+                <span className="field-error" id="erro-prioridade">
+                  {errors.justificativaPrioridade.message}
+                </span>
+              )}
             </label>
           )}
         </div>
@@ -301,54 +512,84 @@ export function ReservaForm({
             <p>Adicione os itens e as quantidades necessárias.</p>
           </div>
         </div>
-        {fields.map((f, i) => (
-          <div className="equipment-form-row" key={f.id}>
-            <label>
-              Equipamento
-              <select
-                className="input"
-                {...register(`equipamentos.${i}.equipamentoId`)}
+        <div
+          className="reservation-equipment-fields"
+          role="group"
+          aria-label="Equipamentos solicitados"
+          aria-describedby={
+            errors.equipamentos ? "erro-equipamentos" : undefined
+          }
+        >
+          {fields.map((f, i) => (
+            <div className="equipment-form-row" key={f.id}>
+              <label>
+                Equipamento
+                <select
+                  className="input"
+                  aria-invalid={Boolean(
+                    errors.equipamentos?.[i]?.equipamentoId ||
+                    errors.equipamentos?.message,
+                  )}
+                  aria-describedby={
+                    errors.equipamentos ? "erro-equipamentos" : undefined
+                  }
+                  {...register(`equipamentos.${i}.equipamentoId`)}
+                >
+                  {disponiveis.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nome} ({e.quantidade} no total)
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Quantidade
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={
+                    disponiveis.find(
+                      (e) =>
+                        e.id === equipamentosSelecionados?.[i]?.equipamentoId,
+                    )?.quantidade
+                  }
+                  aria-invalid={Boolean(
+                    errors.equipamentos?.[i]?.quantidade ||
+                    errors.equipamentos?.message,
+                  )}
+                  aria-describedby={
+                    errors.equipamentos ? "erro-equipamentos" : undefined
+                  }
+                  {...register(`equipamentos.${i}.quantidade`, {
+                    valueAsNumber: true,
+                  })}
+                />
+              </label>
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={() => remove(i)}
+                aria-label="Remover equipamento"
               >
-                {disponiveis.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nome} ({e.quantidade} no total)
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Quantidade
-              <input
-                className="input"
-                type="number"
-                min={1}
-                {...register(`equipamentos.${i}.quantidade`, {
-                  valueAsNumber: true,
-                })}
-              />
-            </label>
-            <button
-              type="button"
-              className="button button-ghost"
-              onClick={() => remove(i)}
-              aria-label="Remover equipamento"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        ))}
-        {errors.equipamentos && (
-          <p className="field-error">
-            {errors.equipamentos.message ??
-              "Confira os equipamentos selecionados."}
-          </p>
-        )}
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+          {errors.equipamentos && (
+            <p className="field-error" id="erro-equipamentos">
+              {errors.equipamentos.message ??
+                "Confira os equipamentos selecionados."}
+            </p>
+          )}
+        </div>
         <button
           type="button"
           className="button button-outline button-sm"
-          disabled={!disponiveis.length}
+          disabled={!proximoEquipamento}
           onClick={() =>
-            append({ equipamentoId: disponiveis[0].id, quantidade: 1 })
+            proximoEquipamento &&
+            append({ equipamentoId: proximoEquipamento.id, quantidade: 1 })
           }
         >
           <Plus size={13} />
@@ -381,10 +622,14 @@ export function ReservaForm({
                     className="input"
                     type="date"
                     min={data}
+                    aria-invalid={Boolean(errors.dataFim)}
+                    aria-describedby={
+                      errors.dataFim ? "erro-data-fim" : undefined
+                    }
                     {...register("dataFim")}
                   />
                   {errors.dataFim && (
-                    <span className="field-error">
+                    <span className="field-error" id="erro-data-fim">
                       {errors.dataFim.message}
                     </span>
                   )}
@@ -394,10 +639,14 @@ export function ReservaForm({
                   <input
                     className="input"
                     placeholder="2026-11-02, 2026-11-09"
+                    aria-invalid={Boolean(errors.excecoes)}
+                    aria-describedby={
+                      errors.excecoes ? "erro-excecoes" : undefined
+                    }
                     {...register("excecoes")}
                   />
                   {errors.excecoes && (
-                    <span className="field-error">
+                    <span className="field-error" id="erro-excecoes">
                       {errors.excecoes.message}
                     </span>
                   )}
@@ -418,11 +667,6 @@ export function ReservaForm({
             institucional e conecte o Supabase.
           </p>
         )}
-        {mensagem && (
-          <p role="status" className="notice" style={{ marginTop: 20 }}>
-            {mensagem}
-          </p>
-        )}
         <div className="form-submit">
           <span>
             <ShieldCheck size={13} />
@@ -431,7 +675,13 @@ export function ReservaForm({
           <button
             className="button button-primary"
             type="submit"
-            disabled={pending || demonstracao}
+            disabled={
+              pending ||
+              demonstracao ||
+              Boolean(sucesso) ||
+              semFuncionamento ||
+              !laboratorios.some((l) => l.ativo)
+            }
           >
             {pending ? "Enviando..." : "Enviar solicitação"}
             <ArrowRight size={15} />
@@ -472,6 +722,35 @@ export function ReservaForm({
           </a>
         </section>
       </aside>
+      <dialog
+        ref={dialog}
+        className="reservation-success-dialog"
+        aria-labelledby="reserva-enviada-titulo"
+        aria-describedby="reserva-enviada-descricao"
+        onCancel={novoAgendamento}
+      >
+        <span className="reservation-success-icon">
+          <CircleCheck size={30} aria-hidden="true" />
+        </span>
+        <h2 id="reserva-enviada-titulo">Sua solicitação foi enviada</h2>
+        <p id="reserva-enviada-descricao">{sucesso}</p>
+        <div className="reservation-success-actions">
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={() => router.push("/")}
+          >
+            Voltar ao início
+          </button>
+          <button
+            type="button"
+            className="button button-outline"
+            onClick={novoAgendamento}
+          >
+            Novo agendamento
+          </button>
+        </div>
+      </dialog>
     </div>
   );
 }

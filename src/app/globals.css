@@ -235,6 +235,9 @@ label .input {
   border-bottom: 0;
 }
 .table-scroll {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
 }
 .section-heading {
@@ -274,6 +277,9 @@ label .input {
 .page-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
   gap: 10px;
 }
 .page-heading {
@@ -296,7 +302,12 @@ label .input {
     grid-template-columns: 1fr;
   }
   .section-heading {
+    flex-wrap: wrap;
     padding: 17px;
+  }
+  .section-heading > h2 {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .data-table td,
   .data-table th {

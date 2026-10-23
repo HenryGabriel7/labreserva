@@ -1,0 +1,17 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set search_path = public, extensions;
+select no_plan();
+select lives_ok($$select public._validar_papeis(array['aluno'])$$, 'aluno possui um papel');
+select lives_ok($$select public._validar_papeis(array['professor'])$$, 'professor possui um papel');
+select lives_ok($$select public._validar_papeis(array['funcionario'])$$, 'funcionário possui um papel');
+select lives_ok($$select public._validar_papeis(array['monitor'])$$, 'monitor não precisa acumular aluno');
+select lives_ok($$select public._validar_papeis(array['admin'])$$, 'administrador possui um papel');
+select throws_ok($$select public._validar_papeis(array['aluno','monitor'])$$, 'P0001','PAPEIS_INVALIDOS','RPC recusa papéis acumulados');
+select throws_ok($$select public._validar_papeis('{}'::text[])$$, 'P0001','PAPEIS_INVALIDOS','RPC recusa papel vazio');
+select throws_ok($$select public._validar_papeis(null)$$, 'P0001','PAPEIS_INVALIDOS','RPC recusa array nulo');
+select throws_ok($$select public._validar_papeis(array[null]::text[])$$, 'P0001','PAPEIS_INVALIDOS','RPC recusa papel nulo');
+select throws_ok($$select public._validar_papeis(array['superadmin'])$$, 'P0001','PAPEIS_INVALIDOS','RPC recusa papel desconhecido');
+select ok(not has_function_privilege('authenticated','public._validar_papeis(text[])','EXECUTE'),'validador interno não exposto no API');
+select * from finish();
+rollback;

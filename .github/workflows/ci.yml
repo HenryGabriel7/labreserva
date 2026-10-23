@@ -41,7 +41,7 @@ jobs:
       - run: npm audit --audit-level=high
       - name: Instalar Chromium e bibliotecas do sistema
         run: npx playwright install --with-deps chromium
-      - name: E2E desktop, 360 px, WCAG e fluxos Supabase
+      - name: E2E desktop, 320/360/390 px, WCAG e fluxos Supabase
         run: npm run test:e2e
       - name: Guardar relatório de testes locais
         if: ${{ !cancelled() }}

@@ -49,6 +49,8 @@ async function solicitarNaTela(
   page: Page,
   laboratorioId: string,
   finalidade: string,
+  solicitanteId: string,
+  depois: "inicio" | "novo" = "inicio",
 ) {
   await page.goto(`/reservas/nova?lab=${laboratorioId}`);
   await page
@@ -60,8 +62,40 @@ async function solicitarNaTela(
   await page.getByLabel("Finalidade da reserva").fill(finalidade);
   await page.getByLabel("Número de participantes").fill("3");
   await page.getByRole("button", { name: "Enviar solicitação" }).click();
-  await expect(page).toHaveURL(/\/reservas\/[a-f0-9-]{36}$/);
-  return new URL(page.url()).pathname.split("/").at(-1)!;
+  const confirmacao = page.getByRole("dialog", {
+    name: "Sua solicitação foi enviada",
+  });
+  await expect(confirmacao).toBeVisible();
+  await expect(
+    confirmacao.getByRole("button", { name: "Voltar ao início" }),
+  ).toBeVisible();
+  await expect(
+    confirmacao.getByRole("button", { name: "Novo agendamento" }),
+  ).toBeVisible();
+  const reserva = exigirSucesso(
+    await clienteServico()
+      .from("reservas")
+      .select("id,status")
+      .eq("laboratorio_id", laboratorioId)
+      .eq("solicitante_id", solicitanteId)
+      .eq("finalidade", finalidade)
+      .single(),
+    "Conferir solicitação criada pela tela",
+  );
+  expect(reserva.status).toBe("pendente");
+  await confirmacao
+    .getByRole("button", {
+      name: depois === "novo" ? "Novo agendamento" : "Voltar ao início",
+    })
+    .click();
+  if (depois === "novo") {
+    await expect(confirmacao).not.toBeVisible();
+    await expect(
+      page.getByLabel("Finalidade da reserva", { exact: true }),
+    ).toHaveValue("");
+  } else await expect(page).toHaveURL(`${liveURL}/`);
+  await page.goto(`/reservas/${reserva.id}`);
+  return reserva.id as string;
 }
 const card = (page: Page, finalidade: string) =>
   page.locator("article").filter({
@@ -85,6 +119,15 @@ async function aprovarNaTela(
 ) {
   await page.goto(`/monitor?lab=${laboratorioId}`);
   const pedido = card(page, finalidade);
+  await pedido.getByRole("button", { name: "Aprovar", exact: true }).click();
+  await expect(pedido.getByRole("alert")).toContainText(
+    "Informe o motivo desta decisão.",
+  );
+  await expect(pedido.getByLabel("Motivo da decisão")).toBeFocused();
+  await expect(pedido.getByLabel("Motivo da decisão")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
   await pedido
     .getByLabel("Motivo da decisão")
     .fill("Aprovação de atividade durante teste local.");
@@ -107,6 +150,55 @@ test.describe("fluxos reais Supabase local", () => {
     await Promise.all(contextos.splice(0).map((contexto) => contexto.close()));
   });
 
+  test("duração e alinhamento aparecem em vermelho no campo antes do envio", async ({
+    page,
+  }) => {
+    const lab = await criarLaboratorio(clienteServico(), pessoas.monitor.id);
+    const finalidade = `QA validação ${randomUUID().slice(0, 8)}`;
+    await entrar(page, pessoas.aluno.email);
+    await page.goto(`/reservas/nova?lab=${lab.id}`);
+    await page.getByLabel("Data", { exact: true }).fill(horarioFuturo().data);
+    const inicio = page.getByLabel("Horário de início", { exact: true });
+    const fim = page.getByLabel("Horário de término", { exact: true });
+    await inicio.fill("14:00");
+    await fim.fill("14:30");
+    await page
+      .getByLabel("Finalidade da reserva", { exact: true })
+      .fill(finalidade);
+    const enviar = page.getByRole("button", { name: "Enviar solicitação" });
+    await enviar.click();
+    await expect(fim).toBeFocused();
+    await expect(fim).toHaveAttribute("aria-invalid", "true");
+    await expect(fim).toHaveCSS("border-color", "rgb(179, 48, 48)");
+    await expect(page.locator("#erro-fim")).toContainText("60 a 240 minutos");
+    await expect(page.locator("#erro-fim")).toHaveCSS(
+      "color",
+      "rgb(179, 48, 48)",
+    );
+    await inicio.fill("14:15");
+    await fim.fill("15:15");
+    await enviar.click();
+    await expect(inicio).toBeFocused();
+    await expect(inicio).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#erro-inicio")).toContainText(
+      "passos de 60 minutos",
+    );
+    const tentativas = await clienteServico()
+      .from("reservas")
+      .select("id", { count: "exact", head: true })
+      .eq("laboratorio_id", lab.id)
+      .eq("solicitante_id", pessoas.aluno.id)
+      .eq("finalidade", finalidade);
+    expect(tentativas.error).toBeNull();
+    expect(tentativas.count).toBe(0);
+    await inicio.fill("14:00");
+    await fim.fill("15:00");
+    await enviar.click();
+    await expect(
+      page.getByRole("dialog", { name: "Sua solicitação foi enviada" }),
+    ).toBeVisible();
+  });
+
   test("login → solicitar → monitor aprova → check-in → check-out", async ({
     page,
     browser,
@@ -114,7 +206,13 @@ test.describe("fluxos reais Supabase local", () => {
     const lab = await criarLaboratorio(clienteServico(), pessoas.monitor.id);
     const finalidade = `QA ciclo ${randomUUID().slice(0, 8)}`;
     await entrar(page, pessoas.aluno.email);
-    const id = await solicitarNaTela(page, lab.id, finalidade);
+    const id = await solicitarNaTela(
+      page,
+      lab.id,
+      finalidade,
+      pessoas.aluno.id,
+      "novo",
+    );
     const monitor = await novaPagina(browser);
     await entrar(monitor, pessoas.monitor.email);
     await aprovarNaTela(monitor, lab.id, finalidade, id);
@@ -150,13 +248,23 @@ test.describe("fluxos reais Supabase local", () => {
     const atividadeAluno = `QA aluno ${randomUUID().slice(0, 8)}`;
     const atividadeProfessor = `QA professor ${randomUUID().slice(0, 8)}`;
     await entrar(page, pessoas.aluno.email);
-    const antiga = await solicitarNaTela(page, lab.id, atividadeAluno);
+    const antiga = await solicitarNaTela(
+      page,
+      lab.id,
+      atividadeAluno,
+      pessoas.aluno.id,
+    );
     const monitor = await novaPagina(browser);
     await entrar(monitor, pessoas.monitor.email);
     await aprovarNaTela(monitor, lab.id, atividadeAluno, antiga);
     const professor = await novaPagina(browser);
     await entrar(professor, pessoas.professor.email);
-    const nova = await solicitarNaTela(professor, lab.id, atividadeProfessor);
+    const nova = await solicitarNaTela(
+      professor,
+      lab.id,
+      atividadeProfessor,
+      pessoas.professor.id,
+    );
     await monitor.goto(`/monitor?lab=${lab.id}`);
     const pedido = card(monitor, atividadeProfessor);
     await expect(
@@ -199,6 +307,7 @@ test.describe("fluxos reais Supabase local", () => {
       page,
       lab.id,
       `QA cancelamento ${randomUUID().slice(0, 8)}`,
+      pessoas.aluno.id,
     );
     await page
       .getByRole("button", { name: "Cancelar reserva", exact: true })

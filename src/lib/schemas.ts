@@ -47,6 +47,101 @@ export const janelaSchema = z
     message: "O fim precisa ser depois do início",
     path: ["fim"],
   });
+const funcionamentoLaboratorioSchema = z
+  .object({
+    dia_semana: z.number().int().min(0).max(6),
+    inicio: horaSchema,
+    fim: horaSchema,
+    duracao_slot_minutos: z.number().int().min(1).max(720),
+  })
+  .strict();
+const equipamentoLaboratorioSchema = equipamentoSchema.omit({
+  laboratorio_id: true,
+});
+const minutosHorario = (hora: string) =>
+  Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3, 5));
+export const laboratorioCompletoSchema = laboratorioSchema
+  .safeExtend({
+    janelas: z
+      .array(funcionamentoLaboratorioSchema)
+      .min(1, "Adicione pelo menos um horário de funcionamento.")
+      .max(50),
+    equipamentos: z.array(equipamentoLaboratorioSchema).max(100),
+  })
+  .superRefine((v, ctx) => {
+    v.janelas.forEach((janela, i) => {
+      const inicio = minutosHorario(janela.inicio);
+      const fim = minutosHorario(janela.fim);
+      const passo =
+        v.modo_reserva === "slot_fixo"
+          ? janela.duracao_slot_minutos
+          : v.granularidade_minutos;
+      const menorReserva = Math.ceil(v.duracao_minima_minutos / passo) * passo;
+      if (fim <= inicio)
+        ctx.addIssue({
+          code: "custom",
+          message: "O encerramento precisa ser depois da abertura.",
+          path: ["janelas", i, "fim"],
+        });
+      else if (
+        menorReserva > fim - inicio ||
+        menorReserva > v.duracao_maxima_minutos
+      )
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Este horário não comporta uma reserva válida. Confira a duração mínima, máxima e o intervalo entre horários.",
+          path: ["janelas", i, "duracao_slot_minutos"],
+        });
+      if (
+        (janela.inicio.slice(5) && janela.inicio.slice(5) !== ":00") ||
+        (janela.fim.slice(5) && janela.fim.slice(5) !== ":00")
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Use horários sem segundos.",
+          path: ["janelas", i, "inicio"],
+        });
+      if (
+        v.janelas.some(
+          (outra, j) =>
+            j < i &&
+            outra.dia_semana === janela.dia_semana &&
+            minutosHorario(outra.inicio) < fim &&
+            minutosHorario(outra.fim) > inicio,
+        )
+      )
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Este horário se sobrepõe a outro funcionamento do mesmo dia.",
+          path: ["janelas", i, "inicio"],
+        });
+    });
+    v.equipamentos.forEach((item, i) => {
+      if (
+        item.patrimonio &&
+        v.equipamentos.some(
+          (outro, j) => j < i && outro.patrimonio === item.patrimonio,
+        )
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Este patrimônio já foi informado em outro equipamento.",
+          path: ["equipamentos", i, "patrimonio"],
+        });
+      if (
+        item.id &&
+        v.equipamentos.some((outro, j) => j < i && outro.id === item.id)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Equipamento repetido.",
+          path: ["equipamentos", i, "nome"],
+        });
+    });
+  });
+export type LaboratorioCompleto = z.infer<typeof laboratorioCompletoSchema>;
 export const bloqueioSchema = z
   .object({
     id: uuidSchema.optional(),

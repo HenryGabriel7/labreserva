@@ -46,7 +46,7 @@ export default async function UsuariosPage({
         email: "mariana.costa@instituicao.edu.br",
         matricula: "202400183",
         ativo: true,
-        papeis: ["aluno", "monitor"],
+        papeis: ["monitor"],
         laboratorioIds: [laboratorios[0]?.id].filter(
           (id): id is string => !!id,
         ),

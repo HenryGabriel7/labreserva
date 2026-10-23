@@ -8,8 +8,18 @@ const equipamento = z
 export const recorrenciaSchema = z
   .object({
     diaSemana: z.number().int().min(0).max(6),
-    horaInicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-    horaFim: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    horaInicio: z
+      .string()
+      .regex(
+        /^([01]\d|2[0-3]):[0-5]\d$/,
+        "Informe um horário de início válido.",
+      ),
+    horaFim: z
+      .string()
+      .regex(
+        /^([01]\d|2[0-3]):[0-5]\d$/,
+        "Informe um horário de término válido.",
+      ),
     dataInicio: z.iso.date(),
     dataFim: z.iso.date(),
     excecoes: z.array(z.iso.date()).max(200),
@@ -66,9 +76,19 @@ export const reservaSchema = z
 export const reservaFormularioSchema = z
   .object({
     ...campos,
-    data: z.iso.date(),
-    horaInicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-    horaFim: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    data: z.iso.date("Selecione uma data válida."),
+    horaInicio: z
+      .string()
+      .regex(
+        /^([01]\d|2[0-3]):[0-5]\d$/,
+        "Informe um horário de início válido.",
+      ),
+    horaFim: z
+      .string()
+      .regex(
+        /^([01]\d|2[0-3]):[0-5]\d$/,
+        "Informe um horário de término válido.",
+      ),
     repetir: z.boolean(),
     dataFim: z.string().max(10),
     excecoes: z.string().max(2000),
@@ -86,6 +106,7 @@ export const reservaFormularioSchema = z
         path: ["dataFim"],
       });
     if (
+      v.repetir &&
       v.excecoes
         .split(",")
         .map((d) => d.trim())

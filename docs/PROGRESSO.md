@@ -1,19 +1,36 @@
 # Progresso
 
-Atualizado em 22/10/2026. Implementação das 11 etapas concluída; aplicação e banco publicados. O envio de e-mails depende da configuração do Resend, que o proprietário informou ainda não possuir.
+Atualizado em 23/10/2026. As 11 etapas originais e a implantação de 22/10 estão concluídas. A rodada de ajustes solicitada em 23/10 está em validação final; o deploy desse código ainda não foi confirmado. O envio de e-mails depende da configuração do Resend, que o proprietário informou ainda não possuir.
+
+## Ajustes de 23/10 — validação em andamento
+
+- Papel único na criação/edição de usuários e importação CSV, com a mesma regra na validação da API e dos RPCs. Contas legadas com múltiplos papéis não foram alteradas automaticamente.
+- Notificações e opções do perfil abrem painéis compactos no cabeçalho. A busca por laboratórios no cabeçalho e o bloco de campus do menu lateral foram removidos; teclado, fechamento, foco e navegação móvel foram revisados.
+- O formulário de reserva informa os erros em vermelho e aponta os campos correspondentes. Confere todos os períodos do dia, alinhamento, duração, antecedência, capacidade e equipamentos antes do envio; o banco continua sendo a autoridade final. O envio bem-sucedido apresenta diálogo central com **Voltar ao início** e **Novo agendamento**.
+- Criar/editar laboratório reúne seus dados, funcionamento e equipamentos em um único formulário e RPC transacional. Há botão **Editar** visível. Equipamentos mantêm seus IDs e histórico; remoção explícita desativa o item, enquanto itens omitidos são preservados. Alterações incompatíveis com reservas aprovadas fazem rollback, sem cancelar ou apagar reservas.
+- O diagnóstico no Supabase encontrou o laboratório real **Lab Quimica** com zero janelas de funcionamento e zero equipamentos; sem funcionamento, a reserva é corretamente recusada pelo banco. A administração escolheu configurar os horários reais depois pelo botão **Editar**. O aplicativo mostra o aviso, sem inventar horários para o laboratório existente.
+- As migrações hospedadas `20261023193250_laboratorio_completo` e `20261023193257_papel_unico` foram aplicadas e os arquivos locais correspondem às versões registradas pelo MCP.
+- O build consolidado após as correções CSS passou; lint global passou com zero avisos e TypeScript passou. A suíte integrada passou novamente com **115 testes em 17 arquivos**; 259 asserções SQL passaram no PostgreSQL WASM, sem substituir pgTAP/Supabase nativo desta rodada.
+- Os **108 casos de demonstração em Chrome passaram**, com 54 casos em desktop/360 px e 54 em 320/390 px; as capturas foram também revisadas visualmente. A ferramenta ChatGPT in Chrome foi tentada, mas não disponibilizou o Chrome via CUA; os testes usam o Chrome instalado pelo Playwright.
+- No QA com banco hospedado, login, navegação, RBAC, erros de duração/slot em vermelho com foco, envio real e diálogo com os dois botões passaram para os cinco papéis. Criar usuário pela UI e rejeitar múltiplos papéis na API/CSV passaram. Criar/editar laboratório com funcionamento e equipamentos passou, incluindo a repetição após corrigir a corrida de montagem do formulário.
+- Dez verificações de operações autenticadas passaram, incluindo aprovação, recusa, cancelamento, autorização e bloqueio de autoaprovação, foto privada/assinada em ocorrência, check-in/out e no-show persistidos. Somente o relógio de duas reservas QA foi ajustado; os valores antes/depois ficaram em `test-results/qa-remoto/operacoes.json`, ignorado. As regras globais não foram alteradas.
+- O mobile autenticado encontrou três overflows a 320 px em `/reservas`, `/monitor` e `/usuarios`, ausentes na demonstração. Foram corrigidos com quebra de texto e ajuste da área de rolagem, sem ocultar conteúdo. Um diagnóstico de 52 verificações com CSS injetado passou; a repetição definitiva no build real para os cinco papéis ainda está em andamento.
+- As fixtures remotas usam contas separadas em `@example.invalid`, senhas aleatórias ignoradas pelo Git e nenhum envio real de e-mail. O encerramento está planejado: desativar contas e laboratório QA, dispensar mensagens dessas contas e preservar auditoria. Ainda não foi registrado como concluído.
+
+Próximos registros desta rodada: repetição móvel autenticada dos cinco papéis e caso adicional de reservas/monitor, CI nativo, publicação na Vercel e encerramento das fixtures. Evidências e limites estão em [TESTES](TESTES.md).
 
 ## Implantação
 
 - Aplicação: [labreserva.vercel.app](https://labreserva.vercel.app), Vercel em São Paulo (`gru1`), Node.js 24. Os pushes em `main` publicam automaticamente a partir do [repositório privado](https://github.com/HenryGabriel7/labreserva).
-- Banco: projeto Supabase `labreserva`, referência `hvcetcfairwfuyxlyynl`, organização `HenryGabriel7`, região `sa-east-1`. As oito migrações estão aplicadas e o histórico corresponde às versões do repositório.
-- Verificado no banco hospedado: 18 tabelas públicas com RLS, dois buckets privados, dois jobs criados, um administrador ativo e nenhum laboratório demonstrativo. O seed e suas senhas de desenvolvimento não foram usados em produção.
+- Banco: projeto Supabase `labreserva`, referência `hvcetcfairwfuyxlyynl`, organização `HenryGabriel7`, região `sa-east-1`. As oito migrações da implantação inicial e as duas migrações de 23/10 estão aplicadas; o histórico corresponde às versões do repositório.
+- Verificado na implantação de 22/10: 18 tabelas públicas com RLS, dois buckets privados, dois jobs criados, um administrador ativo e nenhum laboratório demonstrativo. O seed e suas senhas de desenvolvimento não foram usados em produção. A rodada atual acrescenta fixtures QA separadas e temporárias, descritas acima.
 - Auth hospedado: login por e-mail ativo, signup público bloqueado, senha mínima de 12 caracteres com complexidade e redirects restritos à origem definitiva. API anônima de laboratórios recusada com HTTP 401.
 - Edge Function `processar-notificacoes` publicada com autenticação por segredo próprio. Requisição sem segredo recusada com HTTP 401. O Vault de invocação foi mantido sem os valores de envio enquanto o Resend estiver ausente.
-- Primeiro administrador provisionado com o e-mail fornecido pelo proprietário. O convite inicial é entregue em `.env.primeiro-acesso.local.html`, arquivo privado fora do Git e do deploy, sem senha padrão nem token impresso. A ativação e a definição da senha ficam a cargo do proprietário.
+- Primeiro administrador provisionado com o e-mail fornecido pelo proprietário. O convite inicial foi entregue em `.env.primeiro-acesso.local.html`, arquivo privado fora do Git e do deploy, sem senha padrão nem token impresso. As contas pessoais não são usadas como fixtures de teste.
 
 Detalhes operacionais e configuração restante: [DEPLOY](DEPLOY.md).
 
-## Validação
+## Validação da implantação de 22/10
 
 | Camada                     | Resultado confirmado                                                                                                                                                     |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -58,7 +75,7 @@ A preparação de produção acrescentou correções de Auth, upload direto para
 ## Pendente e próximo passo
 
 - Configurar Resend, remetente/DNS e webhook, completar os secrets de e-mail e o Vault e validar entrega, retry, descadastro e supressão conforme [EMAIL](EMAIL.md). Nenhuma entrega real foi afirmada como aprovada.
-- Definir a senha pelo convite inicial e cadastrar laboratórios, equipamentos, funcionamento e monitores pela interface administrativa.
+- Concluir a configuração real de funcionamento do Lab Quimica em **Laboratórios → Gestão dos espaços → Editar** e cadastrar equipamentos e vínculos de monitores pela interface administrativa, conforme a instituição.
 - Confirmar o contato institucional e a retenção conforme [SEGURANCA](SEGURANCA.md). Os advisors registram os helpers/RPCs SECURITY DEFINER e tabelas service-only intencionais; a proteção de senhas vazadas depende do plano Pro e não foi contratada.
 
 Para repetir a validação completa em desenvolvimento, com Docker:
@@ -77,4 +94,4 @@ npm run build
 npm run test:e2e
 ```
 
-Os testes com fixtures e service_role recusam projetos remotos. As instruções de implantação já realizada estão separadas desses comandos de desenvolvimento em [DEPLOY](DEPLOY.md).
+As suítes automatizadas de CI com fixtures e service_role recusam projetos remotos. A verificação manual remota autorizada em 23/10 usa um script separado com projeto e origem fixados, sem retirar essa proteção do CI. As instruções de implantação já realizada estão separadas desses comandos de desenvolvimento em [DEPLOY](DEPLOY.md).

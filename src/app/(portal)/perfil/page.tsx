@@ -86,7 +86,7 @@ export default async function PerfilPage() {
             preferencias={preferencias}
             demonstracao={demonstracao}
           />
-          <section className="panel profile-security">
+          <section id="seguranca" className="panel profile-security">
             <h2>
               <ShieldCheck size={18} color="#087f67" />
               Segurança da sua conta

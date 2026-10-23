@@ -1,6 +1,15 @@
 # Implantação do LabReserva
 
-Atualizado em 22/10/2026.
+Atualizado em 23/10/2026. O banco já recebeu as duas novas migrações desta rodada. O rollout do código atualizado na Vercel ainda está pendente; os resultados da publicação de 22/10 abaixo permanecem identificados como histórico.
+
+## Rollout de 23/10 — em validação
+
+- Banco: dez migrações aplicadas no total. As novas versões são `20261023193250_laboratorio_completo` e `20261023193257_papel_unico`, iguais aos arquivos do repositório. Não houve edição de migrações já aplicadas.
+- Código: build consolidado após o último ajuste de CSS passou, lint global passou sem avisos e TypeScript passou. Os 115 testes unitários em 17 arquivos foram repetidos com sucesso. As 259 asserções SQL em WASM passaram; pgTAP nativo e integração no CI ainda aguardam execução desta versão.
+- Navegador: 108 casos da demonstração passaram em Chrome, incluindo desktop e 320/360/390 px, com revisão visual das capturas. Nos cinco papéis, passaram login/navegação/RBAC, erros de duração/slot em vermelho com foco, envio real e diálogo de sucesso com os dois botões. Criar usuário, rejeitar múltiplos papéis na API/CSV e criar/editar laboratório integrado passaram. Dez verificações adicionais de decisão, cancelamento, autorização, ocorrência com foto privada/assinada, check-in/out e no-show também passaram.
+- Mobile autenticado: a verificação com dados reais encontrou três overflows a 320 px (`/reservas`, `/monitor`, `/usuarios`), que a demonstração não reproduzia. As correções usam quebra de texto e ajuste da área de rolagem da tabela, sem ocultar conteúdo. O diagnóstico de 52 verificações com CSS injetado passou; a repetição definitiva nos cinco papéis sobre o build consolidado ainda está em andamento.
+- Operação: o laboratório real Lab Quimica permanece sem horários presumidos; a administração configurará o funcionamento real pelo botão **Editar**. As contas e o laboratório de QA são isolados e serão desativados ao concluir, preservando histórico e dispensando seus e-mails. O encerramento ainda precisa ser confirmado.
+- Publicação: o deploy desta rodada e seu smoke posterior ainda não foram confirmados. A URL existente abaixo é o destino de produção, não evidência de que já contém o código novo.
 
 ## Recursos publicados
 
@@ -15,11 +24,11 @@ Atualizado em 22/10/2026.
 | Organização e região do banco | `HenryGabriel7`, `sa-east-1`                    |
 | API Supabase                  | https://hvcetcfairwfuyxlyynl.supabase.co        |
 
-Os pushes em `main` publicam automaticamente na Vercel. `vercel.json` fixa Next.js, instalação por `npm ci`, build por `npm run build` e a região. O banco foi criado sem seed: não há contas, senhas ou laboratórios demonstrativos. O único administrador foi provisionado pelo bootstrap operacional, com o e-mail informado pelo proprietário.
+Os pushes em `main` publicam automaticamente na Vercel. `vercel.json` fixa Next.js, instalação por `npm ci`, build por `npm run build` e a região. O banco foi inicialmente criado sem seed nem senhas de desenvolvimento; o primeiro administrador foi provisionado pelo bootstrap operacional com o e-mail informado pelo proprietário. A rodada de 23/10 usa fixtures QA separadas e temporárias, descritas em [TESTES](TESTES.md), sem utilizar as contas pessoais.
 
 ## Banco e Auth
 
-As oito migrações estão aplicadas, com versões iguais às dos arquivos do repositório. São 18 tabelas públicas com RLS, RPCs com autorização, dois buckets privados de 5 MiB por arquivo e dois jobs cron. O histórico permanece compatível com futuras migrações pelo CLI.
+As dez migrações estão aplicadas, com versões iguais às dos arquivos do repositório: oito da implantação inicial e duas de 23/10. São 18 tabelas públicas com RLS, RPCs com autorização, dois buckets privados de 5 MiB por arquivo e dois jobs cron. O histórico permanece compatível com futuras migrações pelo CLI.
 
 Auth permite login por e-mail, bloqueia signup público e usuários anônimos, exige senha de 12 caracteres com maiúscula, minúscula, número e símbolo e usa `https://labreserva.vercel.app` como Site URL. A allowlist de redirect contém somente `/auth/confirm` e `/definir-senha` nessa origem. Não é necessário alterar a configuração local de desenvolvimento para esses valores.
 
@@ -45,11 +54,11 @@ Para ativar os e-mails:
 
 Criar contas e recuperar senhas continuará enfileirando mensagens, mas sua entrega depende dessa configuração.
 
-## Verificação e avisos do Supabase
+## Histórico da implantação de 22/10 e avisos do Supabase
 
-O [CI completo](https://github.com/HenryGabriel7/labreserva/actions/runs/39832599914), commit `558f554`, passou: 79 testes unitários, 216 asserções pgTAP nativas, cinco integrações, 50 E2E, worker Deno, lint, tipos, build e npm audit.
+O [CI completo de 22/10](https://github.com/HenryGabriel7/labreserva/actions/runs/39832599914), commit `558f554`, passou: 79 testes unitários, 216 asserções pgTAP nativas, cinco integrações, 50 E2E, worker Deno, lint, tipos, build e npm audit. Esse run não valida as alterações de 23/10.
 
-O smoke de produção verificou login e privacidade HTTP 200, redirecionamento da área interna para login, ausência do modo de demonstração, API administrativa HTTP 401 sem sessão e ausência de erros JavaScript no navegador. O Auth hospedado confirmou provider Email ativo e signup público bloqueado; o acesso anônimo aos laboratórios e ao worker foi recusado.
+O smoke de produção de 22/10 verificou login e privacidade HTTP 200, redirecionamento da área interna para login, ausência do modo de demonstração, API administrativa HTTP 401 sem sessão e ausência de erros JavaScript no navegador. O Auth hospedado confirmou provider Email ativo e signup público bloqueado; o acesso anônimo aos laboratórios e ao worker foi recusado.
 
 Os advisors identificaram três tabelas service-only com RLS sem policies de cliente (`rate_limits`, `supressoes_email` e `ocorrencia_uploads`): o bloqueio é intencional. O aviso sobre funções SECURITY DEFINER executáveis por usuários autenticados corresponde às RPCs autorizadas e helpers de RLS definidos na especificação; não foi removida a validação de sessão, papel ou vínculo para silenciar o aviso. Referências: [RLS sem policy](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy), [funções SECURITY DEFINER](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
 

@@ -28,6 +28,7 @@ export function PreferenciasForm({
   });
   return (
     <form
+      id="preferencias"
       className="panel profile-preferences"
       onSubmit={handleSubmit((dados) =>
         transicao(async () => setEstado(await salvarPreferencias({}, dados))),

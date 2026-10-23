@@ -220,3 +220,16 @@
     font-size: 10px;
   }
 }
+.monitor-error {
+  padding: 13px 15px;
+  border: 1px solid #e8b6b6;
+  border-radius: 7px;
+  background: #fff2f2;
+  color: #a32626;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.monitor-decision input[aria-invalid="true"] {
+  border-color: #b33030;
+  box-shadow: 0 0 0 1px #b33030;
+}

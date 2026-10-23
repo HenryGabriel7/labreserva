@@ -12,7 +12,7 @@ Construa do zero um sistema web de reserva de laboratórios para uma instituiç�
 - Identificadores em português ASCII (snake_case no banco, camelCase no TS): `n_participantes`, nunca `nº_participantes`.
 
 ## 2. Papéis
-Em `user_roles`, acumuláveis (ex.: aluno + monitor). Prioridade do solicitante: professor/funcionário = 2, aluno = 1 (monitor e admin não alteram). Ninguém decide a própria solicitação.
+Um único papel por conta nos formulários de criação e edição, na importação CSV e nos RPCs administrativos. Prioridade do solicitante: professor/funcionário = 2, demais = 1. Ninguém decide a própria solicitação. Contas legadas não são alteradas automaticamente; ao editá-las, é obrigatório escolher somente um papel.
 
 | Papel | Pode |
 |---|---|

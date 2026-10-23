@@ -5,8 +5,11 @@ import {
   intervaloValido,
   horariosSlots,
   diasCalendario,
+  validarHorarioReserva,
+  campoErroReserva,
 } from "@/lib/reservas";
-import { reservaSchema } from "@/lib/schemas-reservas";
+import { reservaSchema, reservaFormularioSchema } from "@/lib/schemas-reservas";
+import { labsDemo, janelasDemo } from "@/lib/demo";
 it("papeis acumulados elevam prioridade só professor ou funcionário", () => {
   expect(prioridadeSolicitante(["aluno", "monitor", "admin"])).toBe(1);
   expect(prioridadeSolicitante(["funcionario", "monitor"])).toBe(2);
@@ -97,5 +100,198 @@ it("entrada de reserva não permite solicitante ou status forjado", () => {
   );
   expect(
     reservaSchema.safeParse({ ...v, escopo: "equipamentos" }).success,
+  ).toBe(false);
+});
+
+const laboratorio = { ...labsDemo[0], modo_reserva: "slot_fixo" as const };
+const contextoHorario = {
+  laboratorio,
+  janelas: janelasDemo,
+  data: "2026-11-02",
+  horaInicio: "09:00",
+  horaFim: "10:00",
+  politica: { antecedenciaMinHoras: 1, antecedenciaMaxDias: 90 },
+  agora: new Date("2026-11-01T12:00:00Z"),
+};
+it("explica a duração rejeitada com limites, duração selecionada e campo", () => {
+  const erros = validarHorarioReserva({ ...contextoHorario, horaFim: "09:30" });
+  expect(erros).toEqual([
+    {
+      campo: "horaFim",
+      mensagem: expect.stringMatching(/60 a 240 minutos.*30 minutos.*término/),
+    },
+  ]);
+});
+it("diferencia início e término desalinhados em slot fixo", () => {
+  expect(
+    validarHorarioReserva({
+      ...contextoHorario,
+      horaInicio: "09:15",
+      horaFim: "10:15",
+    }),
+  ).toEqual([
+    {
+      campo: "horaInicio",
+      mensagem: expect.stringMatching(/60 minutos.*08:00.*início/),
+    },
+  ]);
+  expect(
+    validarHorarioReserva({ ...contextoHorario, horaFim: "10:15" }),
+  ).toEqual([
+    {
+      campo: "horaFim",
+      mensagem: expect.stringMatching(/60 minutos.*término/),
+    },
+  ]);
+  expect(validarHorarioReserva(contextoHorario)).toEqual([]);
+});
+it("aceita janela posterior e alinha a partir da abertura, sem atravessar o intervalo fechado", () => {
+  const base = {
+    ...janelasDemo[0],
+    laboratorio_id: laboratorio.id,
+    dia_semana: 1,
+  };
+  const janelas = [
+    { ...base, inicio: "08:30:00", fim: "12:30:00" },
+    { ...base, id: "tarde", inicio: "14:30:00", fim: "18:30:00" },
+  ];
+  expect(
+    validarHorarioReserva({
+      ...contextoHorario,
+      janelas,
+      horaInicio: "14:30",
+      horaFim: "15:30",
+    }),
+  ).toEqual([]);
+  expect(
+    validarHorarioReserva({
+      ...contextoHorario,
+      janelas,
+      horaInicio: "12:30",
+      horaFim: "14:30",
+    }),
+  ).toEqual([
+    {
+      campo: "horaInicio",
+      mensagem: expect.stringContaining("dentro do mesmo período"),
+    },
+  ]);
+});
+it("explica a falta de funcionamento e distingue o dia fechado", () => {
+  expect(validarHorarioReserva({ ...contextoHorario, janelas: [] })).toEqual([
+    {
+      campo: "data",
+      mensagem: expect.stringContaining("não tem funcionamento cadastrado"),
+    },
+  ]);
+  expect(
+    validarHorarioReserva({ ...contextoHorario, data: "2026-11-07" })[0]?.campo,
+  ).toBe("data");
+});
+it("horários futuros respeitam antecedência real e fuso Brasília", () => {
+  expect(
+    validarHorarioReserva({
+      ...contextoHorario,
+      agora: new Date("2026-11-02T11:30:00Z"),
+    })[0],
+  ).toEqual({
+    campo: "horaInicio",
+    mensagem: expect.stringContaining("1 hora(s) de antecedência"),
+  });
+  expect(
+    validarHorarioReserva({
+      ...contextoHorario,
+      agora: new Date("2026-11-02T12:00:00Z"),
+    })[0]?.campo,
+  ).toBe("horaInicio");
+  expect(
+    validarHorarioReserva({ ...contextoHorario, data: "2027-03-01" })[0]?.campo,
+  ).toBe("data");
+});
+it("intervalo livre usa a granularidade do laboratório em vez do slot", () => {
+  const livre = {
+    ...laboratorio,
+    modo_reserva: "intervalo_livre" as const,
+    granularidade_minutos: 15,
+    duracao_minima_minutos: 30,
+  };
+  expect(
+    validarHorarioReserva({
+      ...contextoHorario,
+      laboratorio: livre,
+      horaInicio: "09:15",
+      horaFim: "09:45",
+    }),
+  ).toEqual([]);
+  expect(
+    validarHorarioReserva({
+      ...contextoHorario,
+      laboratorio: livre,
+      horaInicio: "09:17",
+      horaFim: "09:47",
+    })[0]?.campo,
+  ).toBe("horaInicio");
+});
+it("direciona erros RPC conhecidos ao campo e não usa detalhes internos", () => {
+  expect(campoErroReserva({ code: "P0001", message: "DURACAO_INVALIDA" })).toBe(
+    "horaFim",
+  );
+  expect(campoErroReserva({ message: "FORA_DA_JANELA" })).toBe("horaInicio");
+  expect(campoErroReserva({ message: "SQL secreto" })).toBeUndefined();
+  expect(campoErroReserva({ message: "__proto__" })).toBeUndefined();
+});
+it("horários vazios não recebem valores artificiais e apontam seu campo", () => {
+  const resultado = reservaFormularioSchema.safeParse({
+    laboratorioId: laboratorio.id,
+    data: "2026-11-02",
+    horaInicio: "",
+    horaFim: "",
+    escopo: "laboratorio",
+    finalidade: "Aula prática",
+    nParticipantes: 1,
+    justificativaPrioridade: "",
+    equipamentos: [],
+    repetir: false,
+    dataFim: "",
+    excecoes: "",
+  });
+  expect(resultado.success).toBe(false);
+  if (!resultado.success)
+    expect(resultado.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ["horaInicio"],
+          message: "Informe um horário de início válido.",
+        }),
+        expect.objectContaining({
+          path: ["horaFim"],
+          message: "Informe um horário de término válido.",
+        }),
+      ]),
+    );
+});
+
+it("recorrência desmarcada não fica bloqueada por uma exceção agora oculta", () => {
+  const entrada = {
+    laboratorioId: laboratorio.id,
+    data: "2026-11-02",
+    horaInicio: "09:00",
+    horaFim: "10:00",
+    escopo: "laboratorio",
+    finalidade: "Aula prática",
+    nParticipantes: 1,
+    justificativaPrioridade: "",
+    equipamentos: [],
+    repetir: false,
+    dataFim: "",
+    excecoes: "data digitada incorretamente",
+  };
+  expect(reservaFormularioSchema.safeParse(entrada).success).toBe(true);
+  expect(
+    reservaFormularioSchema.safeParse({
+      ...entrada,
+      repetir: true,
+      dataFim: "2026-11-30",
+    }).success,
   ).toBe(false);
 });

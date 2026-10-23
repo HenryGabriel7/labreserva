@@ -1,7 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 import { ambienteLocal } from "./tests/integration/helpers";
 
-const demoURL = "http://127.0.0.1:3101";
+const demoPort = Number(process.env.PLAYWRIGHT_DEMO_PORT || "3101");
+if (!Number.isInteger(demoPort) || demoPort < 1024 || demoPort > 65535)
+  throw new Error(
+    "PLAYWRIGHT_DEMO_PORT precisa ser uma porta entre 1024 e 65535.",
+  );
+const demoURL = `http://127.0.0.1:${demoPort}`;
 const liveURL = "https://127.0.0.1:3100";
 const servidor = (porta: number, demonstracao: boolean) => ({
   command: demonstracao
@@ -36,6 +41,7 @@ export default defineConfig({
   expect: { timeout: 10000 },
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
+    channel: process.env.PLAYWRIGHT_CHROME_CHANNEL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     locale: "pt-BR",
@@ -52,12 +58,34 @@ export default defineConfig({
       },
     },
     {
+      name: "demo-mobile-320",
+      testMatch: "demo.spec.ts",
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: demoURL,
+        viewport: { width: 320, height: 800 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    {
       name: "demo-mobile-360",
       testMatch: "demo.spec.ts",
       use: {
         ...devices["Desktop Chrome"],
         baseURL: demoURL,
         viewport: { width: 360, height: 800 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    {
+      name: "demo-mobile-390",
+      testMatch: "demo.spec.ts",
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: demoURL,
+        viewport: { width: 390, height: 844 },
         isMobile: true,
         hasTouch: true,
       },
@@ -74,7 +102,7 @@ export default defineConfig({
     },
   ],
   webServer: [
-    servidor(3101, true),
+    servidor(demoPort, true),
     ...(ambienteLocal ? [servidor(3100, false)] : []),
   ],
 });

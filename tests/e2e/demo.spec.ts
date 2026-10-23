@@ -1,6 +1,124 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test("cabeçalho abre notificações e opções da conta sem trocar de página", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const cabecalho = page.getByRole("banner");
+  await expect(cabecalho.getByRole("textbox")).toHaveCount(0);
+  await expect(page.getByText("Campus principal", { exact: true })).toHaveCount(
+    0,
+  );
+  const sino = cabecalho.getByRole("button", {
+    name: "Notificações",
+    exact: true,
+  });
+  await sino.click();
+  const painel = page.getByRole("dialog", { name: "Notificações recentes" });
+  await expect(painel).toBeVisible();
+  await expect(painel.getByText("Sua reserva foi aprovada")).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(
+    painel.getByRole("button", { name: "Fechar notificações" }),
+  ).toBeFocused();
+  await expect(
+    painel.getByRole("button", { name: "Marcar como lidas" }),
+  ).toBeDisabled();
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(painel).toHaveCount(0);
+  await expect(sino).toBeFocused();
+
+  const perfil = cabecalho.getByRole("button", { name: /Menu de perfil/ });
+  await perfil.click();
+  const menu = page.getByRole("menu", { name: "Opções da conta" });
+  await expect(
+    menu.getByRole("menuitem", { name: "Meu perfil", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    menu.getByRole("menuitem", { name: "Preferências", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(
+    menu.getByRole("menuitem", { name: "Entrar na instituição" }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(perfil).toBeFocused();
+  await perfil.click();
+  await page
+    .getByRole("heading", { level: 1 })
+    .click({ position: { x: 1, y: 1 } });
+  await expect(menu).toHaveCount(0);
+  await perfil.click();
+  await menu.getByRole("menuitem", { name: "Segurança", exact: true }).click();
+  await expect(page).toHaveURL(/\/perfil#seguranca$/);
+  await expect(page.locator("#seguranca")).toBeInViewport();
+});
+
+for (const largura of [320, 360, 390]) {
+  test(`menus compactos e navegação por teclado em ${largura}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: largura, height: 800 });
+    await page.goto("/");
+    const sino = page.getByRole("button", {
+      name: "Notificações",
+      exact: true,
+    });
+    await sino.click();
+    const painel = page.getByRole("dialog", { name: "Notificações recentes" });
+    const limites = await painel.boundingBox();
+    expect(limites?.x).toBeGreaterThanOrEqual(0);
+    expect((limites?.x ?? 0) + (limites?.width ?? 0)).toBeLessThanOrEqual(
+      largura,
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.keyboard.press("Escape");
+
+    const abrir = page.getByRole("button", { name: "Abrir menu", exact: true });
+    await abrir.click();
+    const lateral = page.getByRole("dialog", {
+      name: "Menu principal",
+      exact: true,
+    });
+    const fechar = lateral.getByRole("button", {
+      name: "Fechar menu principal",
+    });
+    await expect(lateral).toBeVisible();
+    await expect(fechar).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(
+      lateral.getByRole("link", { name: "Privacidade e segurança" }),
+    ).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(fechar).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(lateral).toHaveCount(0);
+    await expect(abrir).toBeFocused();
+    await expect(
+      page.getByRole("navigation", { name: "Navegação rápida" }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+}
+
 const rotas = [
   "/",
   "/laboratorios",

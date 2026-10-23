@@ -47,12 +47,17 @@ const mensagens: Record<string, string> = {
   RECORRENCIA_INVALIDA: "Confira os dias, as datas e o limite da recorrência.",
   RECORRENCIA_SEM_DATAS: "Nenhuma data elegível foi encontrada para a série.",
 };
-export function mensagemErro(erro: unknown): string {
+export function codigoErro(erro: unknown): string | undefined {
   if (erro && typeof erro === "object") {
     const valor = erro as { code?: string; message?: string };
-    if (valor.code && mensagens[valor.code]) return mensagens[valor.code];
-    if (valor.message && mensagens[valor.message])
-      return mensagens[valor.message];
+    if (valor.code && Object.hasOwn(mensagens, valor.code)) return valor.code;
+    if (valor.message && Object.hasOwn(mensagens, valor.message))
+      return valor.message;
   }
-  return "Não foi possível concluir a operação. Confira os dados e tente novamente.";
+}
+export function mensagemErro(erro: unknown): string {
+  const codigo = codigoErro(erro);
+  return codigo
+    ? mensagens[codigo]
+    : "Não foi possível concluir a operação. Confira os dados e tente novamente.";
 }

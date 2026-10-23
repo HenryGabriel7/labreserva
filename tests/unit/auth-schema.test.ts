@@ -45,13 +45,31 @@ describe("entradas de autenticação", () => {
       }).success,
     ).toBe(true);
   });
-  it("valida papéis acumuláveis sem repetição e UUIDs de vínculos", () => {
+  it("exige exatamente um papel e valida UUIDs de vínculos", () => {
     const convite = {
       nome: "Pessoa Exemplo",
       email: "pessoa@exemplo.edu.br",
-      papeis: ["aluno", "monitor"],
+      papeis: ["aluno"],
     };
     expect(conviteSchema.safeParse(convite).success).toBe(true);
+    expect(
+      conviteSchema.safeParse({ ...convite, nome: "A".repeat(151) }).success,
+    ).toBe(false);
+    expect(
+      conviteSchema.safeParse({ ...convite, papeis: ["aluno", "monitor"] })
+        .success,
+    ).toBe(false);
+    expect(conviteSchema.safeParse({ ...convite, papeis: [] }).success).toBe(
+      false,
+    );
+    expect(
+      alterarUsuarioSchema.safeParse({
+        id: "93000000-0000-4000-8000-000000000001",
+        nome: "Pessoa",
+        ativo: true,
+        papeis: ["aluno", "monitor"],
+      }).success,
+    ).toBe(false);
     expect(
       conviteSchema.safeParse({ ...convite, papeis: ["admin", "admin"] })
         .success,
@@ -80,13 +98,18 @@ describe("entradas de autenticação", () => {
 
 describe("CSV de convites", () => {
   const cabecalho = "nome,email,matricula,papeis\n";
-  it("aceita aspas, vírgulas e múltiplos papéis", () => {
+  it("aceita aspas e vírgulas com um único papel", () => {
     const usuarios = lerCsvUsuarios(
-      `${cabecalho}\"Maria, Silva\",maria@exemplo.edu.br,123,aluno|monitor\n`,
+      `${cabecalho}\"Maria, Silva\",maria@exemplo.edu.br,123,monitor\n`,
     );
     expect(usuarios).toHaveLength(1);
     expect(usuarios[0].nome).toBe("Maria, Silva");
-    expect(usuarios[0].papeis).toEqual(["aluno", "monitor"]);
+    expect(usuarios[0].papeis).toEqual(["monitor"]);
+    expect(() =>
+      lerCsvUsuarios(
+        `${cabecalho}Maria Silva,maria@exemplo.edu.br,123,aluno|monitor`,
+      ),
+    ).toThrow("somente um papel");
   });
   it("valida tudo antes de produzir convites", () => {
     expect(() =>

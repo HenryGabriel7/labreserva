@@ -6,14 +6,29 @@ import { createClient } from "./supabase/server";
 import { createAdminClient } from "./supabase/admin";
 import { reservaSchema, cancelarSchema } from "./schemas-reservas";
 import { mensagemErro } from "./errors";
+import { campoErroReserva, type CampoErroReserva } from "./reservas";
 export async function solicitarReservaAction(dados: unknown) {
   const usuario = await requireUser();
   const parsed = reservaSchema.safeParse(dados);
-  if (!parsed.success)
+  if (!parsed.success) {
+    const campos: Record<string, CampoErroReserva> = {
+      laboratorioId: "laboratorioId",
+      inicio: "horaInicio",
+      fim: "horaFim",
+      recorrencia: "dataFim",
+      escopo: "equipamentos",
+      equipamentos: "equipamentos",
+      nParticipantes: "nParticipantes",
+      finalidade: "finalidade",
+      justificativaPrioridade: "justificativaPrioridade",
+    };
+    const chave = String(parsed.error.issues[0]?.path[0]);
     return {
       ok: false,
       mensagem: parsed.error.issues[0]?.message ?? "Dados inválidos.",
+      campo: Object.hasOwn(campos, chave) ? campos[chave] : undefined,
     };
+  }
   const v = parsed.data;
   if (
     (v.justificativaPrioridade || v.recorrencia) &&
@@ -59,7 +74,12 @@ export async function solicitarReservaAction(dados: unknown) {
         }
       : null,
   });
-  if (error) return { ok: false, mensagem: mensagemErro(error) };
+  if (error)
+    return {
+      ok: false,
+      mensagem: mensagemErro(error),
+      campo: campoErroReserva(error),
+    };
   revalidatePath("/", "layout");
   return {
     ok: true,

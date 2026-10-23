@@ -9,6 +9,7 @@ import {
   getContexto,
 } from "@/lib/data";
 import { ReservaForm } from "@/components/reserva-form";
+import { createClient } from "@/lib/supabase/server";
 import "../reservas.css";
 const schema = z
   .object({
@@ -37,6 +38,22 @@ export default async function NovaReserva({
     getContexto(),
   ]);
   const parsed = schema.safeParse(params);
+  const politica = { antecedenciaMinHoras: 1, antecedenciaMaxDias: 90 };
+  if (!ctx.demonstracao) {
+    const db = await createClient();
+    const { data: regras, error } = await db
+      .from("configuracoes")
+      .select("chave,valor")
+      .in("chave", ["antecedencia_min_horas", "antecedencia_max_dias"]);
+    if (error)
+      throw new Error("Não foi possível carregar a política de reservas.");
+    for (const regra of regras) {
+      if (regra.chave === "antecedencia_min_horas")
+        politica.antecedenciaMinHoras = Number(regra.valor);
+      if (regra.chave === "antecedencia_max_dias")
+        politica.antecedenciaMaxDias = Number(regra.valor);
+    }
+  }
   return (
     <>
       <Link
@@ -53,6 +70,7 @@ export default async function NovaReserva({
       />
       <ReservaForm
         {...{ laboratorios, equipamentos, janelas }}
+        politica={politica}
         labInicial={parsed.success ? parsed.data.lab : undefined}
         dataInicial={parsed.success ? parsed.data.data : undefined}
         horaInicioInicial={parsed.success ? parsed.data.inicio : undefined}

@@ -33,14 +33,14 @@ export const definirSenhaSchema = z
 const papeisSchema = z
   .array(z.enum(papeis))
   .min(1, "Selecione um papel.")
-  .max(5)
+  .max(1, "Selecione somente um papel de acesso.")
   .refine(
     (valores) => new Set(valores).size === valores.length,
     "Papéis repetidos.",
   );
 export const conviteSchema = z
   .object({
-    nome: z.string().trim().min(2).max(160),
+    nome: z.string().trim().min(2).max(150),
     email: emailSchema,
     matricula: z.string().trim().max(80).nullable().optional(),
     papeis: papeisSchema,
@@ -52,7 +52,7 @@ export const importarUsuariosSchema = z
 export const alterarUsuarioSchema = z
   .object({
     id: z.uuid(),
-    nome: z.string().trim().min(2).max(160),
+    nome: z.string().trim().min(2).max(150),
     matricula: z.string().trim().max(80).nullable().optional(),
     ativo: z.boolean(),
     papeis: papeisSchema,
@@ -106,7 +106,9 @@ export function lerCsvUsuarios(csv: string): ConviteUsuario[] {
       papeis: linha.papeis?.split("|").map((papel) => papel.trim()),
     });
     if (!dados.success)
-      throw new Error(`Linha ${indice + 2}: confira nome, e-mail e papéis.`);
+      throw new Error(
+        `Linha ${indice + 2}: confira nome, e-mail e selecione somente um papel de acesso.`,
+      );
     if (emails.has(dados.data.email))
       throw new Error(`Linha ${indice + 2}: e-mail repetido no arquivo.`);
     emails.add(dados.data.email);

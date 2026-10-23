@@ -17,16 +17,23 @@ const host = "127.0.0.1";
 const portaNext = 3102;
 
 /** Somente QA local: o Next continua em produção, atrás de TLS no loopback. */
-export async function iniciarServidorE2e() {
+export async function iniciarServidorE2e(opcoes = {}) {
   if (process.env.APP_URL !== origem)
     throw new Error("O proxy E2E exige APP_URL=https://127.0.0.1:3100.");
   if (
     process.env.SUPABASE_URL &&
     !["127.0.0.1", "localhost", "[::1]"].includes(
       new URL(process.env.SUPABASE_URL).hostname,
+    ) &&
+    !(
+      opcoes.qaRemoto === true &&
+      process.env.LABRESERVA_QA_AUTORIZADO === "1" &&
+      process.env.SUPABASE_URL === "https://hvcetcfairwfuyxlyynl.supabase.co"
     )
   )
-    throw new Error("O proxy E2E não aceita Supabase remoto.");
+    throw new Error(
+      "O proxy E2E exige Supabase local ou o roteiro remoto explicitamente autorizado.",
+    );
 
   const pastaTemporaria = mkdtempSync(join(tmpdir(), "labreserva-e2e-tls-"));
   const chave = join(pastaTemporaria, "key.pem");

@@ -5,6 +5,7 @@ import { requireUser } from "./auth";
 import { createClient } from "./supabase/server";
 import {
   laboratorioSchema,
+  laboratorioCompletoSchema,
   equipamentoSchema,
   janelaSchema,
   bloqueioSchema,
@@ -33,6 +34,64 @@ async function salvar(
 }
 export async function salvarLaboratorioAction(dados: unknown) {
   return salvar(laboratorioSchema, dados, "salvar_laboratorio");
+}
+export async function salvarLaboratorioCompletoAction(dados: unknown) {
+  await requireUser(["admin"], { sensitive: true });
+  const parsed = laboratorioCompletoSchema.safeParse(dados);
+  if (!parsed.success)
+    return {
+      ok: false,
+      mensagem: "Revise os campos destacados antes de salvar o laboratório.",
+      campos: Object.fromEntries(
+        parsed.error.issues.map((erro) => [erro.path.join("."), erro.message]),
+      ),
+    };
+  const { id, janelas, equipamentos, ...laboratorio } = parsed.data;
+  const db = await createClient();
+  const { data, error } = await db.rpc("salvar_laboratorio_completo", {
+    p_id: id ?? null,
+    p_dados: laboratorio,
+    p_janelas: janelas,
+    p_equipamentos: equipamentos,
+  });
+  if (error) {
+    const mensagens: Record<string, string> = {
+      FUNCIONAMENTO_OBRIGATORIO:
+        "Adicione pelo menos um horário de funcionamento.",
+      FUNCIONAMENTO_INCOMPATIVEL:
+        "O funcionamento precisa comportar uma reserva dentro da duração mínima e máxima.",
+      JANELAS_SOBREPOSTAS:
+        "Os horários de funcionamento do mesmo dia não podem se sobrepor.",
+      EQUIPAMENTO_OUTRO_LABORATORIO:
+        "Um equipamento não pertence a este laboratório. Atualize a página.",
+      EQUIPAMENTO_DUPLICADO: "Um equipamento foi informado mais de uma vez.",
+      "23505":
+        "Um patrimônio já está cadastrado. Confira os patrimônios dos equipamentos.",
+      FORA_DA_JANELA:
+        "Há reservas aprovadas fora do novo funcionamento. Mantenha esses horários ou resolva as reservas antes de alterar o laboratório.",
+      DURACAO_INVALIDA:
+        "Há reservas aprovadas com uma duração incompatível com os novos limites. Revise os limites antes de salvar.",
+      EQUIPAMENTO_INDISPONIVEL:
+        "Um equipamento alterado é necessário para uma reserva aprovada. Mantenha sua disponibilidade ou resolva a reserva antes de alterar.",
+      CAPACIDADE_INVALIDA:
+        "A nova capacidade é menor que a quantidade de participantes de uma reserva aprovada.",
+    };
+    return {
+      ok: false,
+      mensagem:
+        mensagens[error.message] ??
+        mensagens[error.code] ??
+        mensagemErro(error),
+      campos: {} as Record<string, string>,
+    };
+  }
+  revalidatePath("/", "layout");
+  return {
+    ok: true,
+    mensagem: "Laboratório, funcionamento e equipamentos salvos com sucesso.",
+    id: (data as { id: string }).id,
+    campos: {} as Record<string, string>,
+  };
 }
 export async function salvarEquipamentoAction(dados: unknown) {
   return salvar(equipamentoSchema, dados, "salvar_equipamento");

@@ -256,6 +256,99 @@
   background: #fcefee;
   color: #a33434;
 }
+.cadastro-fieldset {
+  border: 0;
+  border-top: 1px solid #dce6e9;
+  padding: 22px 0 0;
+  margin: 25px 0 0;
+  min-width: 0;
+}
+.cadastro-fieldset legend {
+  padding: 0 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.cadastro-help {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #526877;
+  margin: 0 0 16px;
+}
+.cadastro-repeat-list {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+}
+.cadastro-repeat-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #dce6e9;
+  border-radius: 9px;
+  background: #fafcfc;
+}
+.cadastro-repeat-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.cadastro-repeat-heading h3 {
+  font-size: 12px;
+  margin: 0;
+}
+.cadastro-field-error {
+  color: #a12d2d;
+  font-size: 12px;
+  line-height: 1.5;
+  display: block;
+  margin: 6px 0 0;
+}
+.laboratorio-completo-form .input[aria-invalid="true"] {
+  border-color: #bd3838;
+}
+.cadastro-save {
+  margin-top: 25px;
+}
+.cadastro-warning {
+  display: block;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #914600;
+  margin-top: 8px;
+  max-width: 260px;
+}
+.crud-list-item > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .laboratorio-completo-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .laboratorio-completo-form .form-grid > .full {
+    grid-column: auto;
+  }
+  .crud-list {
+    padding: 4px 14px;
+  }
+  .crud-list-item {
+    flex-wrap: wrap;
+  }
+  .crud-list-item > div:last-child {
+    margin-left: auto;
+  }
+  .crud-list-item .button,
+  .cadastro-repeat-heading .button {
+    min-height: 40px;
+  }
+  .cadastro-repeat-card {
+    padding: 12px;
+  }
+  .cadastro-save {
+    width: 100%;
+  }
+}
 @media (min-width: 1500px) {
   .catalog-grid {
     grid-template-columns: repeat(3, 1fr);

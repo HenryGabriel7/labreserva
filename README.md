@@ -85,7 +85,7 @@ A CLI verifica se já existe qualquer papel `admin`, gera o convite com `auth.ad
 
 Configure worker e Resend antes desse passo. O destinatário abre `/auth/confirm`, o servidor confirma com `verifyOtp` e permite definir a senha. Se o banco falhar depois de Auth criar a identidade, ela pode permanecer sem perfil e sem acesso; não há exclusão automática de contas. Aguarde o limite de dez minutos antes de repetir uma tentativa e investigue o erro de provisionamento.
 
-Depois do primeiro acesso, use **Usuários** para criar contas ou importar CSV com cabeçalho `nome,email,matricula,papeis`; papéis acumulados são separados por `|`. Esse fluxo exige administrador autenticado e usa `provisionar_usuario`, que valida o ator e enfileira o convite. Desativar preserva o histórico.
+Depois do primeiro acesso, use **Usuários** para criar contas ou importar CSV com cabeçalho `nome,email,matricula,papeis`; informe um único papel por conta: `aluno`, `professor`, `funcionario`, `monitor` ou `admin`. Esse fluxo exige administrador autenticado e usa `provisionar_usuario`, que valida o ator e enfileira o convite. Desativar preserva o histórico.
 
 ## Verificação
 

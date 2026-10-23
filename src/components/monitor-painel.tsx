@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Check,
   X,
@@ -87,6 +87,7 @@ function SerieAcoes({
 }) {
   const [motivo, setMotivo] = useState("");
   const [mensagem, setMensagem] = useState("");
+  const [erro, setErro] = useState(false);
   const [pending, startTransition] = useTransition();
   return (
     <div
@@ -122,8 +123,10 @@ function SerieAcoes({
               startTransition(async () => {
                 try {
                   const r = await aprovarSerieAction({ recorrenciaId, motivo });
+                  setErro(!r.ok);
                   setMensagem(r.mensagem);
                 } catch {
+                  setErro(true);
                   setMensagem("Não foi possível aprovar a série.");
                 }
               })
@@ -134,7 +137,11 @@ function SerieAcoes({
         </div>
       )}
       {mensagem && (
-        <p role="status" className="notice" style={{ marginTop: 15 }}>
+        <p
+          role={erro ? "alert" : "status"}
+          className={erro ? "monitor-error" : "notice"}
+          style={{ marginTop: 15 }}
+        >
           {mensagem}
         </p>
       )}
@@ -155,12 +162,32 @@ function MonitorCard({
   const [motivo, setMotivo] = useState("");
   const [antiga, setAntiga] = useState("");
   const [mensagem, setMensagem] = useState("");
+  const [erro, setErro] = useState(false);
+  const motivoInput = useRef<HTMLInputElement>(null);
+  const feedback = useRef<HTMLParagraphElement>(null);
+  const erroNoMotivo =
+    erro && mensagem.toLocaleLowerCase("pt-BR").includes("motivo");
+  useEffect(() => {
+    if (!erro || !mensagem) return;
+    if (erroNoMotivo) motivoInput.current?.focus();
+    else feedback.current?.focus();
+  }, [erro, mensagem, erroNoMotivo]);
   const [pending, startTransition] = useTransition();
   function decidir(
     acao:
       "aprovar" | "recusar" | "checkin" | "checkout" | "no_show" | "substituir",
   ) {
     setMensagem("");
+    setErro(false);
+    if (
+      ["aprovar", "recusar", "no_show", "substituir"].includes(acao) &&
+      motivo.trim().length < 3
+    ) {
+      setErro(true);
+      setMensagem("Informe o motivo desta decisão.");
+      motivoInput.current?.focus();
+      return;
+    }
     startTransition(async () => {
       try {
         const resultado = await decidirReservaAction({
@@ -169,8 +196,10 @@ function MonitorCard({
           motivo,
           ...(acao === "substituir" ? { reservaAntigaId: antiga } : {}),
         });
+        setErro(!resultado.ok);
         setMensagem(resultado.mensagem);
       } catch {
+        setErro(true);
         setMensagem(
           "Não foi possível concluir a ação. Atualize e tente novamente.",
         );
@@ -257,12 +286,17 @@ function MonitorCard({
               ? "Motivo da decisão"
               : "Observações / motivo"}
             <input
+              ref={motivoInput}
               className="input"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               placeholder="Registre o contexto da ação..."
               maxLength={2000}
               disabled={demonstracao || propria || pending}
+              aria-invalid={erroNoMotivo}
+              aria-describedby={
+                erroNoMotivo ? `monitor-feedback-${r.id}` : undefined
+              }
             />
           </label>
           <div className="monitor-buttons">
@@ -371,7 +405,14 @@ function MonitorCard({
         </p>
       )}
       {mensagem && (
-        <p role="status" className="notice" style={{ marginTop: 15 }}>
+        <p
+          ref={feedback}
+          id={`monitor-feedback-${r.id}`}
+          tabIndex={-1}
+          role={erro ? "alert" : "status"}
+          className={erro ? "monitor-error" : "notice"}
+          style={{ marginTop: 15 }}
+        >
           {mensagem}
         </p>
       )}

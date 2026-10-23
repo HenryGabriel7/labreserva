@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions-cadastros";
 import type { Laboratorio, Equipamento, JanelaHorario } from "@/lib/types";
 import { tiposLaboratorio, nomeTipo } from "@/lib/types";
+import { LaboratorioForm } from "./laboratorio-form";
 type Campo = {
   name: string;
   label: string;
@@ -239,6 +240,15 @@ export function AdminCadastros({
                       : laboratorios.find((l) => l.id === item.laboratorio_id)
                           ?.nome}
                   </small>
+                  {tab === "laboratorios" &&
+                    !janelas.some(
+                      (janela) => janela.laboratorio_id === item.id,
+                    ) && (
+                      <span className="cadastro-warning">
+                        Sem funcionamento cadastrado. Edite para permitir
+                        agendamentos.
+                      </span>
+                    )}
                 </div>
                 <div>
                   <button
@@ -247,6 +257,7 @@ export function AdminCadastros({
                     aria-label="Editar cadastro"
                   >
                     <Pencil size={14} />
+                    <span>Editar</span>
                   </button>
                   <button
                     className="button button-ghost button-sm"
@@ -261,14 +272,36 @@ export function AdminCadastros({
             ))}
           </div>
         </section>
-        <CadastroForm
-          key={`${tab}-${editando}`}
-          campos={campos}
-          iniciais={iniciais}
-          id={editando}
-          tab={tab}
-          demonstracao={demonstracao}
-        />
+        {tab === "laboratorios" && editando && !selecionado ? (
+          <section className="panel crud-form" role="status">
+            Carregando os dados do laboratório salvo…
+          </section>
+        ) : tab === "laboratorios" ? (
+          <LaboratorioForm
+            key={`laboratorio-${editando}`}
+            laboratorio={laboratorios.find((lab) => lab.id === editando)}
+            janelas={janelas.filter(
+              (janela) => janela.laboratorio_id === editando,
+            )}
+            equipamentos={equipamentos.filter(
+              (equipamento) => equipamento.laboratorio_id === editando,
+            )}
+            demonstracao={demonstracao}
+            onSaved={(id, mensagem) => {
+              setEditando(id);
+              setMensagem(mensagem);
+            }}
+          />
+        ) : (
+          <CadastroForm
+            key={`${tab}-${editando}`}
+            campos={campos}
+            iniciais={iniciais}
+            id={editando}
+            tab={tab}
+            demonstracao={demonstracao}
+          />
+        )}
       </div>
     </>
   );
