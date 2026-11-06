@@ -29,7 +29,7 @@ export default async function LaboratorioDetail({
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
   const [labs, equips, janelas] = await Promise.all([
-    getLaboratorios(),
+    getLaboratorios("ativos"),
     getEquipamentos(),
     getJanelas(),
   ]);

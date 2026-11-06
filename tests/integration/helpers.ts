@@ -61,7 +61,7 @@ export function exigirSucesso<
 }
 
 export async function criarPessoa(
-  papel: "aluno" | "professor" | "monitor" | "admin",
+  papel: "aluno" | "professor" | "funcionario" | "monitor" | "admin",
   servico = clienteServico(),
 ) {
   const email = `qa-${papel}-${randomUUID()}@teste.edu.br`;

@@ -25,16 +25,14 @@ import { getResumoPainel } from "@/lib/data-painel";
 import "./dashboard.css";
 
 export default async function Dashboard() {
-  const [{ usuario, demonstracao }, labs, { reservas }, resumo] =
-    await Promise.all([
-      getContexto(),
-      getLaboratorios(),
-      getReservas(),
-      getResumoPainel(),
-    ]);
-  const gestor =
-    demonstracao ||
-    usuario?.roles.some((r) => ["admin", "monitor"].includes(r));
+  const { usuario } = await getContexto();
+  const admin = usuario?.roles.includes("admin") ?? false;
+  const gestor = !admin && usuario?.roles.includes("monitor");
+  const [labs, { reservas }, resumo] = await Promise.all([
+    getLaboratorios("ativos"),
+    getReservas({ minhas: !gestor }),
+    getResumoPainel({ pessoal: admin }),
+  ]);
   const hoje = dataBr(new Date().toISOString(), "yyyy-MM-dd");
   const reservasHoje = reservas.filter(
     (r) => dataBr(r.inicio, "yyyy-MM-dd") === hoje,
@@ -80,7 +78,9 @@ export default async function Dashboard() {
       label: "Aguardando aprovação",
       value: pendentes,
       icon: Clock3,
-      note: "Solicitações para analisar",
+      note: gestor
+        ? "Solicitações para analisar"
+        : "Suas solicitações em análise",
       cor: "amber",
     },
     {

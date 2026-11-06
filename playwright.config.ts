@@ -32,6 +32,8 @@ const servidor = (porta: number, demonstracao: boolean) => ({
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // O Playwright limpa esta pasta antes da execução.
+  outputDir: "test-results/playwright",
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

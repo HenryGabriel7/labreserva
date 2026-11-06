@@ -5,6 +5,8 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import {
   Bell,
   CheckCheck,
+  ChevronLeft,
+  ChevronRight,
   ChevronDown,
   KeyRound,
   LogIn,
@@ -25,32 +27,51 @@ const rotulosPapel: Record<string, string> = {
   funcionario: "Funcionário",
   aluno: "Aluno",
 };
+const notificacoesPorPagina = 5;
+const dataNotificacao = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "America/Sao_Paulo",
+});
 
 export function HeaderActions({
   nome,
   roles,
   demonstracao,
+  administrativo,
   notificacoes,
   notificacoesIndisponiveis = false,
 }: {
   nome: string;
   roles: string[];
   demonstracao: boolean;
+  administrativo: boolean;
   notificacoes: ResumoNotificacao[];
   notificacoesIndisponiveis?: boolean;
 }) {
   const [aberto, setAberto] = useState<"notificacoes" | "perfil" | null>(null);
   const [lidas, setLidas] = useState<string[]>([]);
+  const [paginaNotificacoes, setPaginaNotificacoes] = useState(0);
   const [erro, setErro] = useState("");
   const [pendente, transicao] = useTransition();
   const area = useRef<HTMLDivElement>(null);
   const painel = useRef<HTMLDivElement>(null);
   const sino = useRef<HTMLButtonElement>(null);
+  const lista = useRef<HTMLUListElement>(null);
   const perfil = useRef<HTMLButtonElement>(null);
   const id = useId();
   const novas = notificacoes.filter(
     (item) => !item.lidaEm && !lidas.includes(item.id),
   );
+  const ultimaPagina = Math.max(
+    0,
+    Math.ceil(notificacoes.length / notificacoesPorPagina) - 1,
+  );
+  const pagina = Math.min(paginaNotificacoes, ultimaPagina);
+  const inicio = pagina * notificacoesPorPagina;
+  const fim = Math.min(inicio + notificacoesPorPagina, notificacoes.length);
   const iniciais = nome
     .trim()
     .split(/\s+/)
@@ -98,6 +119,11 @@ export function HeaderActions({
       }
     });
   };
+  const mudarPagina = (destino: number) => {
+    setPaginaNotificacoes(destino);
+    lista.current?.focus({ preventScroll: true });
+    if (lista.current) lista.current.scrollTop = 0;
+  };
 
   return (
     <div className="header-actions" ref={area}>
@@ -109,9 +135,10 @@ export function HeaderActions({
         aria-haspopup="dialog"
         aria-expanded={aberto === "notificacoes"}
         aria-controls={`${id}-notificacoes`}
-        onClick={() =>
-          setAberto(aberto === "notificacoes" ? null : "notificacoes")
-        }
+        onClick={() => {
+          setPaginaNotificacoes(0);
+          setAberto(aberto === "notificacoes" ? null : "notificacoes");
+        }}
       >
         <Bell size={20} aria-hidden="true" />
         {novas.length > 0 && (
@@ -149,11 +176,11 @@ export function HeaderActions({
           id={`${id}-notificacoes`}
           className="header-popover notifications-popover"
           role="dialog"
-          aria-label="Notificações recentes"
+          aria-labelledby={`${id}-notificacoes-titulo`}
         >
           <div className="header-popover-heading">
             <div>
-              <h2>Notificações</h2>
+              <h2 id={`${id}-notificacoes-titulo`}>Notificações recentes</h2>
               <p>As últimas atualizações da sua conta</p>
             </div>
             <button
@@ -178,8 +205,14 @@ export function HeaderActions({
               Tudo em dia. Você não tem notificações.
             </p>
           ) : (
-            <ul className="popover-notification-list">
-              {notificacoes.slice(0, 5).map((item) => {
+            <ul
+              ref={lista}
+              id={`${id}-lista-notificacoes`}
+              className="popover-notification-list"
+              aria-label="Atualizações da sua conta"
+              tabIndex={0}
+            >
+              {notificacoes.slice(inicio, fim).map((item) => {
                 const naoLida = !item.lidaEm && !lidas.includes(item.id);
                 return (
                   <li key={item.id} className={naoLida ? "unread" : undefined}>
@@ -190,13 +223,7 @@ export function HeaderActions({
                     <p>{item.mensagem}</p>
                     <div className="popover-notification-meta">
                       <time dateTime={item.criadaEm}>
-                        {new Intl.DateTimeFormat("pt-BR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          timeZone: "America/Sao_Paulo",
-                        }).format(new Date(item.criadaEm))}
+                        {dataNotificacao.format(new Date(item.criadaEm))}
                       </time>
                       {item.reservaId && (
                         <Link
@@ -212,15 +239,37 @@ export function HeaderActions({
               })}
             </ul>
           )}
+          {!notificacoesIndisponiveis && ultimaPagina > 0 && (
+            <div className="popover-notification-pagination">
+              <button
+                type="button"
+                disabled={pagina === 0}
+                onClick={() => mudarPagina(pagina - 1)}
+                aria-controls={`${id}-lista-notificacoes`}
+              >
+                <ChevronLeft size={14} aria-hidden="true" />
+                Mais recentes
+              </button>
+              <span role="status">
+                {inicio + 1}–{fim} de {notificacoes.length}
+              </span>
+              <button
+                type="button"
+                disabled={pagina === ultimaPagina}
+                onClick={() => mudarPagina(pagina + 1)}
+                aria-controls={`${id}-lista-notificacoes`}
+              >
+                Mais antigas
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
+            </div>
+          )}
           {erro && (
             <p className="popover-error" role="alert">
               {erro}
             </p>
           )}
           <div className="header-popover-footer">
-            <Link href="/notificacoes" onClick={() => setAberto(null)}>
-              Ver todas
-            </Link>
             <button
               type="button"
               disabled={demonstracao || pendente || novas.length === 0}
@@ -282,10 +331,10 @@ export function HeaderActions({
           >
             <KeyRound size={17} aria-hidden="true" /> Segurança
           </Link>
-          {(demonstracao || roles.includes("admin")) && (
+          {administrativo && (
             <Link
               role="menuitem"
-              href="/configuracoes"
+              href="/admin/configuracoes"
               onClick={() => setAberto(null)}
             >
               <Settings2 size={17} aria-hidden="true" /> Configurações do

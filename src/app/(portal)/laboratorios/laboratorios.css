@@ -1,38 +1,43 @@
 .catalog-filters {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(180px, 1.5fr) repeat(3, minmax(130px, 1fr)) auto;
+  align-items: end;
   padding: 15px;
   gap: 12px;
-  align-items: center;
 }
-.catalog-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #626d73;
-  flex: 1;
-  min-width: 160px;
-  padding: 0 10px;
+.catalog-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
-.catalog-search input {
-  border: 0;
-  outline: 0;
-  width: 100%;
-  font-size: 12px;
+.catalog-filters :is(.input, .button) {
+  min-height: 44px;
+  font-size: 13px;
 }
 .catalog-filters .input {
-  font-size: 11px;
-  width: auto;
-  min-width: 140px;
+  min-width: 0;
 }
-.catalog-filters input.input {
-  width: 140px;
-  min-width: 100px;
+.catalog-search {
+  position: relative;
+}
+.catalog-search > svg {
+  position: absolute;
+  inset-inline-start: 12px;
+  bottom: 13.5px;
+  color: #626d73;
+  pointer-events: none;
+}
+.catalog-search .input {
+  appearance: none;
+  padding-inline-start: 38px;
 }
 .catalog-caption {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 6px 12px;
   color: #647179;
-  font-size: 10px;
+  font-size: 12px;
   margin: 23px 1px 18px;
 }
 .catalog-caption a {
@@ -40,7 +45,7 @@
 }
 .catalog-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 23px;
 }
 .catalog-card {
@@ -50,6 +55,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   height: 140px;
   padding: 30px;
   position: relative;
@@ -59,6 +65,7 @@
   background-size: 16px 16px;
 }
 .catalog-visual > .lab-icon {
+  flex-shrink: 0;
   width: 80px;
   height: 80px;
   background: #ffffffb8;
@@ -74,6 +81,10 @@
   background: #ffffffc4;
 }
 .catalog-room-code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #5f6f7a;
   text-transform: uppercase;
   letter-spacing: 4px;
@@ -94,9 +105,10 @@
 }
 .catalog-body {
   padding: 24px;
+  overflow-wrap: anywhere;
 }
 .catalog-body .eyebrow {
-  font-size: 8px;
+  font-size: 10px;
 }
 .catalog-body h2 {
   margin: 10px 0 10px;
@@ -105,7 +117,7 @@
   font-weight: 600;
 }
 .catalog-body > p {
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.8;
   color: #606f77;
   margin: 0 0 20px;
@@ -113,14 +125,18 @@
 }
 .catalog-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 20px;
-  font-size: 10px;
+  font-size: 11px;
   color: #5c717e;
 }
 .catalog-meta > span {
   display: flex;
   gap: 5px;
   align-items: center;
+}
+.catalog-meta svg {
+  flex-shrink: 0;
 }
 .catalog-tags {
   margin: 17px 0 22px;
@@ -133,20 +149,20 @@
   color: #607179;
   background: #f3f6f8;
   border-radius: 4px;
-  font-size: 9px;
+  font-size: 11px;
 }
 .catalog-card-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   padding-top: 18px;
   border-top: 1px solid #edf1f3;
 }
-.catalog-card-footer .section-link {
-  font-size: 10px;
-}
+.catalog-card-footer .section-link,
 .catalog-card-footer .button {
-  font-size: 10px;
+  font-size: 12px;
 }
 .detail-columns {
   display: grid;
@@ -351,19 +367,15 @@
 }
 @media (min-width: 1500px) {
   .catalog-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 1200px) {
   .catalog-filters {
-    flex-wrap: wrap;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   }
   .catalog-search {
-    flex-basis: 100%;
-    padding: 6px 10px 12px;
-  }
-  .catalog-filters .input {
-    flex: 1;
+    grid-column: 1 / -1;
   }
   .crud-layout {
     grid-template-columns: 1fr;
@@ -372,9 +384,14 @@
     grid-template-columns: 1fr 250px;
   }
 }
+@media (max-width: 950px) {
+  .catalog-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (max-width: 700px) {
   .catalog-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 18px;
   }
   .catalog-visual {
@@ -388,7 +405,7 @@
     gap: 9px;
   }
   .catalog-filters .input {
-    min-width: 110px;
+    font-size: 16px;
   }
   .catalog-caption > span:last-child {
     display: none;
@@ -406,7 +423,6 @@
     padding: 20px;
   }
   .catalog-meta {
-    gap: 15px;
-    font-size: 9px;
+    gap: 8px 15px;
   }
 }

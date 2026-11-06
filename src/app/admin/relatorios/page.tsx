@@ -15,7 +15,7 @@ import {
   resumoRelatorio,
 } from "@/lib/relatorios";
 import { ExportarRelatorio } from "./exportar-relatorio";
-import "./relatorios.css";
+import "@/components/gestao/relatorios.css";
 
 export default async function RelatoriosPage({
   searchParams,
@@ -91,7 +91,7 @@ export default async function RelatoriosPage({
           até 366 dias.
         </p>
       )}
-      <form className="panel report-filters" action="/relatorios">
+      <form className="panel report-filters" action="/admin/relatorios">
         <label>
           Início do período
           <input
@@ -137,7 +137,7 @@ export default async function RelatoriosPage({
           <EmptyState
             titulo="Relatório indisponível"
             descricao={falha}
-            href={`/relatorios?${base}`}
+            href={`/admin/relatorios?${base}`}
             label="Tentar novamente"
           />
         </div>
@@ -181,7 +181,7 @@ export default async function RelatoriosPage({
           <section className="panel report-section">
             <div className="section-heading">
               <h2>Uso por laboratório</h2>
-              <Link href="/auditoria" className="section-link">
+              <Link href="/admin/auditoria" className="section-link">
                 Consultar auditoria
               </Link>
             </div>
@@ -228,14 +228,14 @@ export default async function RelatoriosPage({
               <EmptyState
                 titulo="Nenhum laboratório nesta página"
                 descricao="Ajuste o filtro ou volte à primeira página do relatório."
-                href={`/relatorios?${base}`}
+                href={`/admin/relatorios?${base}`}
                 label="Primeira página"
               />
             )}
             <Pagination
               pagina={filtros.pagina}
               total={relatorio.por_laboratorio.length}
-              base={`/relatorios?${base}`}
+              base={`/admin/relatorios?${base}`}
             />
           </section>
           <div className="report-sections">
@@ -318,8 +318,8 @@ export default async function RelatoriosPage({
             ao intervalo escolhido. A aprovação reflete o status atual e o papel
             é o registrado no momento da solicitação. Ocorrências usam a data do
             registro.{" "}
-            <Link className="section-link" href="/relatorios/privacidade">
-              Acessar meus dados pessoais
+            <Link className="section-link" href="/admin/privacidade">
+              Acessar privacidade institucional
             </Link>
           </p>
         </>

@@ -7,7 +7,7 @@ import {
 } from "@/lib/data";
 import { PageHeading } from "@/components/shared";
 import { AdminCadastros } from "@/components/admin-cadastros";
-import "../laboratorios.css";
+import "@/app/(portal)/laboratorios/laboratorios.css";
 export default async function Gerenciar() {
   const ctx = await getContexto();
   if (!ctx.demonstracao) await requireUser(["admin"]);

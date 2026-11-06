@@ -17,13 +17,15 @@ import {
   X,
   CircleHelp,
   ArrowUpRight,
+  ArrowRightLeft,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ResumoNotificacao } from "@/lib/notificacoes/resumo";
 import { HeaderActions } from "./header-actions";
 import "./shell.css";
 
-const links = [
+const linksUsuario = [
   {
     href: "/",
     label: "Visão geral",
@@ -48,40 +50,72 @@ const links = [
     icon: ClipboardList,
     group: "workspace",
   },
+];
+const linkMonitor = {
+  href: "/monitor",
+  label: "Solicitações",
+  icon: ShieldCheck,
+};
+const linksAdmin = [
   {
-    href: "/monitor",
-    label: "Solicitações",
-    icon: ShieldCheck,
-    group: "management",
-    roles: ["monitor", "admin"],
+    href: "/admin",
+    label: "Visão geral",
+    icon: LayoutDashboard,
+    group: "workspace",
   },
   {
-    href: "/usuarios",
+    href: "/admin/solicitacoes",
+    label: "Solicitações",
+    icon: ShieldCheck,
+    group: "workspace",
+  },
+  {
+    href: "/admin/laboratorios",
+    label: "Laboratórios",
+    icon: FlaskConical,
+    group: "workspace",
+  },
+  {
+    href: "/admin/usuarios",
     label: "Usuários",
     icon: UsersRound,
     group: "management",
-    roles: ["admin"],
   },
   {
-    href: "/relatorios",
+    href: "/admin/bloqueios",
+    label: "Bloqueios",
+    icon: CalendarDays,
+    group: "management",
+  },
+  {
+    href: "/admin/ocorrencias",
+    label: "Ocorrências",
+    icon: ClipboardCheck,
+    group: "management",
+  },
+  {
+    href: "/admin/relatorios",
     label: "Relatórios",
     icon: ChartNoAxesCombined,
     group: "management",
-    roles: ["admin"],
   },
   {
-    href: "/auditoria",
+    href: "/admin/auditoria",
     label: "Auditoria",
     icon: ClipboardList,
     group: "management",
-    roles: ["admin"],
   },
   {
-    href: "/configuracoes",
+    href: "/admin/configuracoes",
     label: "Configurações",
     icon: Settings2,
     group: "management",
-    roles: ["admin"],
+  },
+  {
+    href: "/admin/privacidade",
+    label: "Privacidade",
+    icon: ShieldCheck,
+    group: "management",
   },
 ];
 
@@ -90,6 +124,7 @@ export function Shell({
   nome = "Visitante",
   roles = [],
   demonstracao = false,
+  administrativo = false,
   pendentes = 0,
   notificacoes = [],
   notificacoesIndisponiveis = false,
@@ -98,6 +133,7 @@ export function Shell({
   nome?: string;
   roles?: string[];
   demonstracao?: boolean;
+  administrativo?: boolean;
   pendentes?: number;
   notificacoes?: ResumoNotificacao[];
   notificacoesIndisponiveis?: boolean;
@@ -145,12 +181,22 @@ export function Shell({
     };
   }, [open]);
   const active = (href: string) =>
-    href === "/" ? path === href : path.startsWith(href);
-  const visible = links.filter(
-    (l) => !l.roles || demonstracao || l.roles.some((r) => roles.includes(r)),
-  );
+    path === href ||
+    (href !== "/" && href !== "/admin" && path.startsWith(`${href}/`)) ||
+    (href === "/admin/solicitacoes" && path.startsWith("/admin/reservas/"));
+  const admin = roles.includes("admin");
+  const podeAlternar = administrativo || demonstracao || admin;
+  const visible = administrativo
+    ? linksAdmin
+    : [
+        ...linksUsuario,
+        ...(!admin && roles.includes("monitor")
+          ? [{ ...linkMonitor, group: "management" }]
+          : []),
+      ];
+  const espaco = administrativo ? "Espaço administrativo" : "Espaço de usuário";
   return (
-    <div className="app-shell">
+    <div className={cn("app-shell", administrativo && "app-shell-admin")}>
       {open && (
         <button
           className="sidebar-overlay"
@@ -180,17 +226,23 @@ export function Shell({
         >
           <X size={20} aria-hidden="true" />
         </button>
-        <Link href="/" className="brand">
+        <Link
+          href={administrativo ? "/admin" : "/"}
+          className="brand"
+          onClick={() => setOpen(false)}
+        >
           <span className="brand-icon">
             <FlaskConical size={22} />
           </span>
           <span>
             Lab<span className="brand-light">Reserva</span>
-            <small>GESTÃO DE LABORATÓRIOS</small>
+            <small>
+              {administrativo ? "ADMINISTRAÇÃO" : "GESTÃO DE LABORATÓRIOS"}
+            </small>
           </span>
         </Link>
-        <nav>
-          <p className="nav-heading">ESPAÇO DE TRABALHO</p>
+        <nav aria-label={espaco}>
+          <p className="nav-heading">{espaco}</p>
           {visible
             .filter((l) => l.group === "workspace")
             .map((l) => (
@@ -243,7 +295,7 @@ export function Shell({
         </div>
       </aside>
       <div className="main-shell" inert={open ? true : undefined}>
-        <header className="topbar">
+        <header className={cn("topbar", podeAlternar && "topbar-com-troca")}>
           <div className="topbar-left">
             <button
               ref={menuButton}
@@ -257,14 +309,27 @@ export function Shell({
               {open ? <X size={21} /> : <Menu size={21} />}
             </button>
             <div className="breadcrumb">
-              Portal acadêmico <span>/</span>
+              <span className="breadcrumb-space">{espaco}</span>
+              <span className="breadcrumb-divider" aria-hidden="true">
+                /
+              </span>
               <strong>
-                {links.find((l) => active(l.href))?.label ?? "Meu espaço"}
+                {visible.find((l) => active(l.href))?.label ?? espaco}
               </strong>
             </div>
           </div>
           <div className="topbar-right">
+            {podeAlternar && (
+              <Link
+                href={administrativo ? "/" : "/admin"}
+                className="button button-outline workspace-switch"
+              >
+                <ArrowRightLeft size={16} aria-hidden="true" />
+                {administrativo ? "Espaço de usuário" : "Espaço administrativo"}
+              </Link>
+            )}
             <HeaderActions
+              administrativo={administrativo}
               nome={nome}
               roles={roles}
               demonstracao={demonstracao}
@@ -308,10 +373,11 @@ export function Shell({
             key={l.href}
             href={l.href}
             className={cn(active(l.href) && "active")}
+            aria-current={active(l.href) ? "page" : undefined}
           >
             <l.icon size={20} />
             <span>
-              {l.href === "/"
+              {l.href === "/" || l.href === "/admin"
                 ? "Início"
                 : l.href === "/reservas"
                   ? "Reservas"

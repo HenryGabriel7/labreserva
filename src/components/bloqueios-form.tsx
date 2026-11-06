@@ -33,11 +33,13 @@ export function BloqueiosForm({
   demonstracao,
   admin,
   bloqueio,
+  base,
 }: {
   laboratorios: Laboratorio[];
   demonstracao: boolean;
   admin: boolean;
   bloqueio?: BloqueioEdicao;
+  base: "/bloqueios" | "/admin/bloqueios";
 }) {
   const router = useRouter();
   const [afetadas, setAfetadas] = useState<Afetada[]>([]);
@@ -100,7 +102,7 @@ export function BloqueiosForm({
             if (r.ok) {
               setConsultado("");
               setAfetadas([]);
-              if (bloqueio) router.replace("/bloqueios");
+              if (bloqueio) router.replace(base);
               else form.reset();
               router.refresh();
             }
@@ -272,7 +274,7 @@ export function BloqueiosForm({
                 : "Confirmar bloqueio"}
           </button>
           {bloqueio && (
-            <Link href="/bloqueios" className="button button-outline">
+            <Link href={base} className="button button-outline">
               Cancelar edição
             </Link>
           )}

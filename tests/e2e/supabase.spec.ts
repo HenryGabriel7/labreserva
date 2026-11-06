@@ -17,12 +17,14 @@ import {
   horarioFuturo,
   motivoSemSupabase,
   senhaDev,
+  solicitar,
 } from "../integration/helpers";
 
 const liveURL = "https://127.0.0.1:3100";
 let pessoas: {
   aluno: Awaited<ReturnType<typeof criarPessoa>>;
   professor: Awaited<ReturnType<typeof criarPessoa>>;
+  funcionario: Awaited<ReturnType<typeof criarPessoa>>;
   monitor: Awaited<ReturnType<typeof criarPessoa>>;
   admin: Awaited<ReturnType<typeof criarPessoa>>;
 };
@@ -45,12 +47,10 @@ async function entrar(page: Page, email: string, senha = senhaDev) {
   await page.getByRole("button", { name: "Entrar na minha conta" }).click();
   await expect(page).toHaveURL(`${liveURL}/`);
 }
-async function solicitarNaTela(
+async function preencherSolicitacao(
   page: Page,
   laboratorioId: string,
   finalidade: string,
-  solicitanteId: string,
-  depois: "inicio" | "novo" = "inicio",
 ) {
   await page.goto(`/reservas/nova?lab=${laboratorioId}`);
   await page
@@ -61,6 +61,15 @@ async function solicitarNaTela(
   await page.getByLabel("Horário de término", { exact: true }).fill("15:00");
   await page.getByLabel("Finalidade da reserva").fill(finalidade);
   await page.getByLabel("Número de participantes").fill("3");
+}
+async function solicitarNaTela(
+  page: Page,
+  laboratorioId: string,
+  finalidade: string,
+  solicitanteId: string,
+  depois: "inicio" | "novo" = "inicio",
+) {
+  await preencherSolicitacao(page, laboratorioId, finalidade);
   await page.getByRole("button", { name: "Enviar solicitação" }).click();
   const confirmacao = page.getByRole("dialog", {
     name: "Sua solicitação foi enviada",
@@ -138,16 +147,226 @@ async function aprovarNaTela(
 test.describe("fluxos reais Supabase local", () => {
   test.skip(!ambienteLocal, motivoSemSupabase);
   test.beforeAll(async () => {
-    const [aluno, professor, monitor, admin] = await Promise.all([
+    const [aluno, professor, funcionario, monitor, admin] = await Promise.all([
       criarPessoa("aluno"),
       criarPessoa("professor"),
+      criarPessoa("funcionario"),
       criarPessoa("monitor"),
       criarPessoa("admin"),
     ]);
-    pessoas = { aluno, professor, monitor, admin };
+    pessoas = { aluno, professor, funcionario, monitor, admin };
   });
   test.afterEach(async () => {
     await Promise.all(contextos.splice(0).map((contexto) => contexto.close()));
+  });
+
+  test("área administrativa sem sessão redireciona para login", async ({
+    page,
+  }) => {
+    await page.goto("/admin/usuarios");
+    await expect(page).toHaveURL(`${liveURL}/login`);
+  });
+
+  for (const papel of [
+    "aluno",
+    "professor",
+    "funcionario",
+    "monitor",
+  ] as const) {
+    test(`${papel} não entra na administração por link direto`, async ({
+      page,
+    }) => {
+      await entrar(page, pessoas[papel].email);
+      await expect(
+        page.getByRole("link", { name: "Espaço administrativo", exact: true }),
+      ).toHaveCount(0);
+      for (const destino of [
+        "/admin",
+        "/admin/usuarios",
+        "/admin/solicitacoes",
+      ]) {
+        await page.goto(destino);
+        await expect(page).toHaveURL(`${liveURL}/acesso-negado`);
+        await expect(
+          page.getByRole("heading", { name: "Acesso não autorizado." }),
+        ).toBeVisible();
+      }
+    });
+  }
+
+  test("admin alterna espaços no celular e agenda no portal de usuário", async ({
+    page,
+  }) => {
+    const servico = clienteServico();
+    const lab = await criarLaboratorio(servico, pessoas.monitor.id);
+    const inativo = await criarLaboratorio(servico);
+    exigirSucesso(
+      await servico
+        .from("laboratorios")
+        .update({ ativo: false })
+        .eq("id", inativo.id),
+      "Preparar laboratório inativo para o teste",
+    );
+    await page.setViewportSize({ width: 320, height: 800 });
+    await entrar(page, pessoas.admin.email);
+    const cabecalho = page.getByRole("banner");
+    const irParaAdmin = cabecalho.getByRole("link", {
+      name: "Espaço administrativo",
+      exact: true,
+    });
+    await expect(irParaAdmin).toBeInViewport();
+    await irParaAdmin.click();
+    await expect(page).toHaveURL(`${liveURL}/admin`);
+    await page.goto("/admin/laboratorios");
+    await expect(page.getByText(inativo.nome, { exact: true })).toBeVisible();
+    await page.goto("/admin/solicitacoes");
+    const voltar = cabecalho.getByRole("link", {
+      name: "Espaço de usuário",
+      exact: true,
+    });
+    await expect(voltar).toBeInViewport();
+    await voltar.click();
+    await expect(page).toHaveURL(`${liveURL}/`);
+    await page.goto(`/reservas/nova?lab=${inativo.id}`);
+    await expect(page.getByRole("status")).toContainText(
+      "O laboratório selecionado não está disponível.",
+    );
+    await expect(
+      page
+        .getByRole("combobox", { name: "Laboratório", exact: true })
+        .locator(`option[value="${inativo.id}"]`),
+    ).toHaveCount(0);
+    const finalidade = `QA reserva de administrador ${randomUUID().slice(0, 8)}`;
+    await solicitarNaTela(page, lab.id, finalidade, pessoas.admin.id);
+    await page.goto(`/admin/solicitacoes?lab=${lab.id}`);
+    await expect(
+      card(page, finalidade).getByRole("button", {
+        name: "Aprovar",
+        exact: true,
+      }),
+    ).toBeDisabled();
+  });
+
+  test("admin abre o detalhe administrativo e recusa a solicitação de outra conta", async ({
+    page,
+  }) => {
+    const lab = await criarLaboratorio(clienteServico(), pessoas.monitor.id);
+    const finalidade = `QA recusa administrativa ${randomUUID().slice(0, 8)}`;
+    const id = await solicitar(pessoas.aluno.cliente, lab.id, finalidade);
+    await entrar(page, pessoas.admin.email);
+    await page.goto(`/monitor?lab=${lab.id}`);
+    await expect(page).toHaveURL(`${liveURL}/admin/solicitacoes?lab=${lab.id}`);
+    const pedido = card(page, finalidade);
+    await pedido.getByRole("link", { name: finalidade, exact: true }).click();
+    await expect(page).toHaveURL(`${liveURL}/admin/reservas/${id}`);
+    await page.goBack();
+    await pedido
+      .getByLabel("Motivo da decisão")
+      .fill("Recusa na área administrativa de teste.");
+    await pedido.getByRole("button", { name: "Recusar", exact: true }).click();
+    await expect.poll(() => status(id)).toBe("recusada");
+  });
+
+  test("monitor agenda no portal de usuário", async ({ page }) => {
+    const lab = await criarLaboratorio(clienteServico(), pessoas.monitor.id);
+    await entrar(page, pessoas.monitor.email);
+    await solicitarNaTela(
+      page,
+      lab.id,
+      `QA reserva de monitor ${randomUUID().slice(0, 8)}`,
+      pessoas.monitor.id,
+    );
+  });
+
+  test("funcionário solicita série de equipamentos e monitor aprova as datas", async ({
+    page,
+    browser,
+  }) => {
+    const servico = clienteServico();
+    const lab = await criarLaboratorio(servico, pessoas.monitor.id);
+    const equipamentoId = randomUUID();
+    exigirSucesso(
+      await servico.from("equipamentos").insert({
+        id: equipamentoId,
+        laboratorio_id: lab.id,
+        nome: "Projetor QA",
+        quantidade: 4,
+        status: "ativo",
+        reservavel_individualmente: true,
+      }),
+      "Criar equipamento de teste",
+    );
+    const finalidade = `QA série de equipamentos ${randomUUID().slice(0, 8)}`;
+    const primeiro = horarioFuturo();
+    const excecao = horarioFuturo(9);
+    const ultimo = horarioFuturo(16);
+    await entrar(page, pessoas.funcionario.email);
+    await preencherSolicitacao(page, lab.id, finalidade);
+    await page.getByLabel("O que você precisa?").selectOption("equipamentos");
+    await page.getByRole("button", { name: "Adicionar equipamento" }).click();
+    await page
+      .getByRole("combobox", { name: "Equipamento", exact: true })
+      .selectOption(equipamentoId);
+    await page
+      .getByRole("spinbutton", { name: "Quantidade", exact: true })
+      .fill("2");
+    await page.getByRole("checkbox", { name: /Repetir semanalmente/ }).check();
+    await page.getByLabel("Repetir até").fill(ultimo.data);
+    await page.getByLabel("Datas de exceção (opcional)").fill(excecao.data);
+    await page.getByRole("button", { name: "Enviar solicitação" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Sua solicitação foi enviada" }),
+    ).toContainText("2 solicitações criadas");
+
+    const reservas = exigirSucesso(
+      await servico
+        .from("reservas")
+        .select("id,inicio,status,escopo,papel_solicitante,recorrencia_id")
+        .eq("laboratorio_id", lab.id)
+        .eq("solicitante_id", pessoas.funcionario.id)
+        .eq("finalidade", finalidade)
+        .order("inicio"),
+      "Conferir as datas e o escopo da série",
+    );
+    expect(reservas).toHaveLength(2);
+    expect(reservas[0].recorrencia_id).toBeTruthy();
+    expect(
+      reservas.map((reserva) => new Date(reserva.inicio).toISOString()),
+    ).toEqual([primeiro.inicio, ultimo.inicio]);
+    for (const reserva of reservas) {
+      expect(reserva).toMatchObject({
+        escopo: "equipamentos",
+        papel_solicitante: "funcionario",
+        recorrencia_id: reservas[0].recorrencia_id,
+        status: "pendente",
+      });
+    }
+    const itens = exigirSucesso(
+      await servico
+        .from("reserva_equipamentos")
+        .select("equipamento_id,quantidade")
+        .in(
+          "reserva_id",
+          reservas.map((reserva) => reserva.id),
+        ),
+      "Conferir a quantidade reservada em cada data",
+    );
+    expect(itens).toEqual(
+      Array(2).fill({ equipamento_id: equipamentoId, quantidade: 2 }),
+    );
+
+    const monitor = await novaPagina(browser);
+    await entrar(monitor, pessoas.monitor.email);
+    await monitor.goto(`/monitor?lab=${lab.id}`);
+    await monitor
+      .getByLabel("Motivo da aprovação")
+      .fill("Série local de equipamentos aprovada durante o teste.");
+    await monitor
+      .getByRole("button", { name: "Aprovar datas sem conflito" })
+      .click();
+    await expect
+      .poll(() => Promise.all(reservas.map((reserva) => status(reserva.id))))
+      .toEqual(["aprovada", "aprovada"]);
   });
 
   test("duração e alinhamento aparecem em vermelho no campo antes do envio", async ({
@@ -331,7 +550,7 @@ test.describe("fluxos reais Supabase local", () => {
     });
     expect(signup.error?.code).toBe("signup_disabled");
     await entrar(page, pessoas.admin.email);
-    await page.goto("/usuarios");
+    await page.goto("/admin/usuarios");
     await page.getByRole("button", { name: "Adicionar usuário" }).click();
     await page.getByLabel("Nome completo").fill("Pessoa convidada no E2E");
     await page.getByLabel("E-mail institucional").fill(email);

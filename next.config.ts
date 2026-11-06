@@ -2,6 +2,31 @@ import type { NextConfig } from "next";
 
 const config: NextConfig = {
   poweredByHeader: false,
+  async redirects() {
+    return [
+      {
+        source: "/laboratorios/gerenciar",
+        destination: "/admin/laboratorios",
+        permanent: false,
+      },
+      { source: "/usuarios", destination: "/admin/usuarios", permanent: false },
+      {
+        source: "/configuracoes",
+        destination: "/admin/configuracoes",
+        permanent: false,
+      },
+      {
+        source: "/auditoria",
+        destination: "/admin/auditoria",
+        permanent: false,
+      },
+      {
+        source: "/relatorios",
+        destination: "/admin/relatorios",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

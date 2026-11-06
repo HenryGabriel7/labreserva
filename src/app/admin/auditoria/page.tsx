@@ -10,7 +10,7 @@ import {
 import { getContexto } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { filtroAuditoriaSchema, intervaloRelatorio } from "@/lib/relatorios";
-import "../relatorios/relatorios.css";
+import "@/components/gestao/relatorios.css";
 
 const registrosSchema = z.array(
   z
@@ -96,7 +96,10 @@ export default async function AuditoriaPage({
           identificadores de ação em letras, números e sublinhado.
         </p>
       )}
-      <form className="panel report-filters audit-filters" action="/auditoria">
+      <form
+        className="panel report-filters audit-filters"
+        action="/admin/auditoria"
+      >
         <label>
           Início
           <input
@@ -174,7 +177,7 @@ export default async function AuditoriaPage({
             <EmptyState
               titulo="Auditoria indisponível"
               descricao="Não foi possível consultar os registros agora."
-              href={`/auditoria?${base}`}
+              href={`/admin/auditoria?${base}`}
               label="Tentar novamente"
             />
           </div>
@@ -253,7 +256,7 @@ export default async function AuditoriaPage({
             <Pagination
               pagina={filtros.pagina}
               total={total}
-              base={`/auditoria?${base}`}
+              base={`/admin/auditoria?${base}`}
             />
           </>
         ) : (
@@ -274,7 +277,7 @@ export default async function AuditoriaPage({
           <Pagination
             pagina={filtros.pagina}
             total={total}
-            base={`/auditoria?${base}`}
+            base={`/admin/auditoria?${base}`}
           />
         )}
       </section>

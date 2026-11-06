@@ -15,17 +15,25 @@ import type { Reserva } from "@/lib/types";
 import { decidirReservaAction } from "@/lib/actions-monitor";
 import { aprovarSerieAction } from "@/lib/actions-reservas";
 import { LabIcon, StatusBadge, dataBr, EmptyState } from "./shared";
+
+type RotasMonitor = {
+  reservasBase: "/reservas" | "/admin/reservas";
+  ocorrenciasBase: "/ocorrencias" | "/admin/ocorrencias";
+};
+
 export function MonitorPainel({
   reservas,
   coincidentes,
   demonstracao,
   usuarioId,
+  reservasBase,
+  ocorrenciasBase,
 }: {
   reservas: Reserva[];
   coincidentes: Reserva[];
   demonstracao: boolean;
   usuarioId?: string;
-}) {
+} & RotasMonitor) {
   const grupos = new Map<string, Reserva[]>();
   for (const r of reservas) {
     const key = r.recorrencia_id ?? r.id;
@@ -59,6 +67,7 @@ export function MonitorPainel({
                 )}
                 demonstracao={demonstracao}
                 propria={r.solicitante_id === usuarioId}
+                {...{ reservasBase, ocorrenciasBase }}
               />
             ))}
           </div>
@@ -153,12 +162,14 @@ function MonitorCard({
   coincidentes,
   demonstracao,
   propria,
+  reservasBase,
+  ocorrenciasBase,
 }: {
   reserva: Reserva;
   coincidentes: Reserva[];
   demonstracao: boolean;
   propria: boolean;
-}) {
+} & RotasMonitor) {
   const [motivo, setMotivo] = useState("");
   const [antiga, setAntiga] = useState("");
   const [mensagem, setMensagem] = useState("");
@@ -232,7 +243,7 @@ function MonitorCard({
           <StatusBadge status={r.status} />
         </div>
       </div>
-      <Link className="monitor-purpose" href={`/reservas/${r.id}`}>
+      <Link className="monitor-purpose" href={`${reservasBase}/${r.id}`}>
         <h2>{r.finalidade}</h2>
         <ChevronRight size={15} />
       </Link>
@@ -353,7 +364,7 @@ function MonitorCard({
             {["em_uso", "concluida", "no_show"].includes(r.status) && (
               <Link
                 className="button button-outline button-sm"
-                href={`/ocorrencias?reserva=${r.id}`}
+                href={`${ocorrenciasBase}?reserva=${r.id}`}
               >
                 Registrar ocorrência
               </Link>
@@ -394,7 +405,7 @@ function MonitorCard({
       {["concluida", "no_show"].includes(r.status) && (
         <Link
           className="button button-outline button-sm"
-          href={`/ocorrencias?reserva=${r.id}`}
+          href={`${ocorrenciasBase}?reserva=${r.id}`}
         >
           Registrar ocorrência
         </Link>

@@ -32,12 +32,15 @@ export default async function NovaReserva({
 }) {
   const [params, laboratorios, equipamentos, janelas, ctx] = await Promise.all([
     searchParams,
-    getLaboratorios(),
+    getLaboratorios("ativos"),
     getEquipamentos(),
     getJanelas(),
     getContexto(),
   ]);
   const parsed = schema.safeParse(params);
+  const parametros = parsed.success ? parsed.data : {};
+  const labInicial = laboratorios.find((lab) => lab.id === parametros.lab)?.id;
+  const labIndisponivel = Boolean(parametros.lab && !labInicial);
   const politica = { antecedenciaMinHoras: 1, antecedenciaMaxDias: 90 };
   if (!ctx.demonstracao) {
     const db = await createClient();
@@ -68,13 +71,18 @@ export default async function NovaReserva({
         titulo="Sua próxima descoberta começa aqui"
         descricao="Reserve um laboratório ou equipamento para dar vida à sua atividade."
       />
+      {labIndisponivel && (
+        <p className="notice" role="status">
+          O laboratório selecionado não está disponível. Escolha outro para
+          continuar.
+        </p>
+      )}
       <ReservaForm
-        {...{ laboratorios, equipamentos, janelas }}
+        {...{ laboratorios, equipamentos, janelas, labInicial }}
         politica={politica}
-        labInicial={parsed.success ? parsed.data.lab : undefined}
-        dataInicial={parsed.success ? parsed.data.data : undefined}
-        horaInicioInicial={parsed.success ? parsed.data.inicio : undefined}
-        horaFimInicial={parsed.success ? parsed.data.fim : undefined}
+        dataInicial={labIndisponivel ? undefined : parametros.data}
+        horaInicioInicial={labIndisponivel ? undefined : parametros.inicio}
+        horaFimInicial={labIndisponivel ? undefined : parametros.fim}
         demonstracao={ctx.demonstracao}
         prioridade={
           ctx.demonstracao ||

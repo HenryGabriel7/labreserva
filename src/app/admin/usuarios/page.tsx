@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { paginacaoUsuariosSchema } from "@/lib/auth-schema";
 import { UsuariosClient, type UsuarioLista } from "./usuarios-client";
-import "../pessoas.css";
+import "@/app/(portal)/pessoas.css";
 
 export default async function UsuariosPage({
   searchParams,
@@ -14,8 +14,9 @@ export default async function UsuariosPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { demonstracao } = await getContexto();
+  if (!demonstracao) await requireUser(["admin"], { sensitive: true });
   const parametros = paginacaoUsuariosSchema.safeParse(await searchParams);
-  if (!parametros.success) redirect("/usuarios");
+  if (!parametros.success) redirect("/admin/usuarios");
   const pagina = parametros.data.pagina;
   const laboratorios = await getLaboratorios();
   let total = 0;
@@ -63,7 +64,6 @@ export default async function UsuariosPage({
     ];
     total = usuarios.length;
   } else {
-    await requireUser(["admin"], { sensitive: true });
     const db = await createClient();
     const perfis = await db
       .from("profiles")
@@ -115,7 +115,7 @@ export default async function UsuariosPage({
         }))}
         demonstracao={demonstracao}
       />
-      <Pagination pagina={pagina} total={total} base="/usuarios" />
+      <Pagination pagina={pagina} total={total} base="/admin/usuarios" />
     </>
   );
 }

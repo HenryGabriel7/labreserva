@@ -1,15 +1,13 @@
 import Link from "next/link";
 import {
   Search,
-  SlidersHorizontal,
   ArrowUpRight,
   UsersRound,
   MapPin,
   Clock3,
-  Plus,
   ArrowRight,
 } from "lucide-react";
-import { getLaboratorios, getEquipamentos, getContexto } from "@/lib/data";
+import { getLaboratorios, getEquipamentos } from "@/lib/data";
 import { filtroCatalogoSchema } from "@/lib/schemas";
 import { PageHeading, LabIcon, EmptyState } from "@/components/shared";
 import { nomeTipo, tiposLaboratorio } from "@/lib/types";
@@ -19,11 +17,10 @@ export default async function Laboratorios({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [params, labs, equipamentos, ctx] = await Promise.all([
+  const [params, labs, equipamentos] = await Promise.all([
     searchParams,
-    getLaboratorios(),
+    getLaboratorios("ativos"),
     getEquipamentos(),
-    getContexto(),
   ]);
   const filtros = filtroCatalogoSchema.safeParse(params);
   const f = filtros.success ? filtros.data : {};
@@ -46,67 +43,75 @@ export default async function Laboratorios({
         titulo="Espaços para descobrir"
         descricao="Conheça nossos laboratórios e encontre o ambiente ideal para a sua atividade."
         acao={
-          ctx.usuario?.roles.includes("admin") ? (
-            <Link
-              href="/laboratorios/gerenciar"
-              className="button button-outline"
-            >
-              <Plus size={15} />
-              Gerenciar laboratórios
-            </Link>
-          ) : (
-            <Link href="/calendario" className="button button-outline">
-              <Clock3 size={15} />
-              Consultar disponibilidade
-            </Link>
-          )
+          <Link href="/calendario" className="button button-outline">
+            <Clock3 size={15} />
+            Consultar disponibilidade
+          </Link>
         }
       />
-      <form className="panel catalog-filters" action="/laboratorios">
-        <div className="catalog-search">
-          <Search size={17} />
+      <form
+        className="panel catalog-filters"
+        action="/laboratorios"
+        method="get"
+        role="search"
+        aria-label="Buscar laboratórios"
+      >
+        <div className="catalog-field catalog-search">
+          <label htmlFor="catalogo-nome">Nome ou descrição</label>
+          <Search size={17} aria-hidden="true" />
           <input
+            className="input"
+            id="catalogo-nome"
+            type="search"
             name="q"
-            placeholder="Busque por nome ou descrição..."
+            placeholder="Ex.: Informática"
             defaultValue={f.q}
-            aria-label="Nome ou descrição"
+            maxLength={100}
           />
         </div>
-        <select
-          className="input"
-          name="tipo"
-          defaultValue={f.tipo ?? ""}
-          aria-label="Tipo de laboratório"
-        >
-          <option value="">Todos os tipos</option>
-          {tiposLaboratorio.map((t) => (
-            <option key={t} value={t}>
-              {nomeTipo[t]}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input"
-          name="capacidade"
-          defaultValue={f.capacidade ?? 0}
-          aria-label="Capacidade mínima"
-        >
-          <option value="0">Qualquer capacidade</option>
-          {[10, 20, 25, 30, 40].map((n) => (
-            <option key={n} value={n}>
-              {n}+ pessoas
-            </option>
-          ))}
-        </select>
-        <input
-          className="input"
-          name="equipamento"
-          defaultValue={f.equipamento}
-          placeholder="Equipamento"
-          aria-label="Filtrar por equipamento"
-        />
+        <div className="catalog-field">
+          <label htmlFor="catalogo-tipo">Tipo de laboratório</label>
+          <select
+            className="input"
+            id="catalogo-tipo"
+            name="tipo"
+            defaultValue={f.tipo ?? ""}
+          >
+            <option value="">Todos</option>
+            {tiposLaboratorio.map((t) => (
+              <option key={t} value={t}>
+                {nomeTipo[t]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="catalog-field">
+          <label htmlFor="catalogo-capacidade">Capacidade mínima</label>
+          <select
+            className="input"
+            id="catalogo-capacidade"
+            name="capacidade"
+            defaultValue={f.capacidade ?? 0}
+          >
+            <option value="0">Qualquer</option>
+            {[10, 20, 25, 30, 40].map((n) => (
+              <option key={n} value={n}>
+                {n}+ pessoas
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="catalog-field">
+          <label htmlFor="catalogo-equipamento">Equipamento</label>
+          <input
+            className="input"
+            id="catalogo-equipamento"
+            name="equipamento"
+            defaultValue={f.equipamento}
+            maxLength={100}
+          />
+        </div>
         <button className="button button-primary" type="submit">
-          <SlidersHorizontal size={15} />
           Filtrar
         </button>
       </form>

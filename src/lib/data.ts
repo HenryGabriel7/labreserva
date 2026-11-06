@@ -19,17 +19,20 @@ export const getContexto = cache(async () => {
   if (!usuario) redirect("/login");
   return { demonstracao: false as boolean, usuario };
 });
-export const getLaboratorios = cache(async (): Promise<Laboratorio[]> => {
-  if ((await getContexto()).demonstracao) return labsDemo;
-  const db = await createClient();
-  const { data, error } = await db
-    .from("laboratorios")
-    .select("*")
-    .order("nome")
-    .limit(100);
-  if (error) throw new Error("Não foi possível carregar os laboratórios.");
-  return data as Laboratorio[];
-});
+export const getLaboratorios = cache(
+  async (filtro: "todos" | "ativos" = "todos"): Promise<Laboratorio[]> => {
+    if ((await getContexto()).demonstracao)
+      return filtro === "ativos"
+        ? labsDemo.filter((lab) => lab.ativo)
+        : labsDemo;
+    const db = await createClient();
+    let consulta = db.from("laboratorios").select("*");
+    if (filtro === "ativos") consulta = consulta.eq("ativo", true);
+    const { data, error } = await consulta.order("nome").limit(100);
+    if (error) throw new Error("Não foi possível carregar os laboratórios.");
+    return data as Laboratorio[];
+  },
+);
 export const getEquipamentos = cache(async (): Promise<Equipamento[]> => {
   if ((await getContexto()).demonstracao) return equipamentosDemo;
   const db = await createClient();
@@ -85,23 +88,35 @@ export async function getReservas({
   return { reservas: data as Reserva[], total: count ?? 0 };
 }
 export async function getNotificacoes(): Promise<Notificacao[]> {
-  if ((await getContexto()).demonstracao)
+  if ((await getContexto()).demonstracao) {
+    const agora = Date.now();
     return [
       {
-        id: "demo",
-        usuario_id: "",
         tipo_evento: "reserva_aprovada",
-        template: "reserva_aprovada",
         payload: {
           titulo: "Sua reserva foi aprovada",
           mensagem:
             "O Laboratório de Redes está reservado para sua próxima atividade.",
         },
-        status: "enviada",
-        created_at: new Date().toISOString(),
-        lida_em: null,
       },
-    ];
+      { tipo_evento: "reserva_criada", payload: {} },
+      { tipo_evento: "reserva_cancelada", payload: {} },
+      { tipo_evento: "reserva_recusada", payload: {} },
+      { tipo_evento: "reserva_substituida", payload: {} },
+      { tipo_evento: "lembrete_reserva", payload: {} },
+    ].map<Notificacao>((notificacao, indice) => {
+      const data = new Date(agora - indice * 3_600_000).toISOString();
+      return {
+        ...notificacao,
+        id: `demo-${indice}`,
+        usuario_id: "",
+        template: notificacao.tipo_evento,
+        status: "enviada",
+        created_at: data,
+        lida_em: indice < 2 ? null : data,
+      };
+    });
+  }
   const db = await createClient();
   const { data, error } = await db
     .from("notificacoes")

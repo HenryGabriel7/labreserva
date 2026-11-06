@@ -21,7 +21,7 @@ export default async function CalendarioPage({
 }) {
   const [params, labs, ctx] = await Promise.all([
     searchParams,
-    getLaboratorios(),
+    getLaboratorios("ativos"),
     getContexto(),
   ]);
   const parsed = schema.safeParse(params);

@@ -184,6 +184,6 @@ export async function salvarConfiguracaoAction(dados: unknown) {
     p_valor: parsed.data.valor,
   });
   if (error) return { ok: false, mensagem: mensagemErro(error) };
-  revalidatePath("/configuracoes");
+  revalidatePath("/admin/configuracoes");
   return { ok: true, mensagem: "Configuração atualizada." };
 }

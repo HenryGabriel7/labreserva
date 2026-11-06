@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeading } from "@/components/shared";
 import { IdentidadeVisualForm } from "@/components/identidade-visual-form";
 import { ConfiguracoesForm } from "@/components/configuracoes-form";
-import "../laboratorios/laboratorios.css";
+import "@/app/(portal)/laboratorios/laboratorios.css";
 export default async function Configuracoes() {
   const ctx = await getContexto();
   if (!ctx.demonstracao) await requireUser(["admin"]);
@@ -36,10 +36,7 @@ export default async function Configuracoes() {
         titulo="Cada instituição, seu jeito de organizar"
         descricao="Ajuste as regras de acesso e de reserva com clareza."
         acao={
-          <Link
-            href="/laboratorios/gerenciar"
-            className="button button-outline"
-          >
+          <Link href="/admin/laboratorios" className="button button-outline">
             Gerenciar cadastros
           </Link>
         }

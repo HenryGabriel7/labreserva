@@ -71,19 +71,26 @@ export function PrivacidadeForm({
         className="panel privacy-form"
         onSubmit={(evento) => enviar(evento, "exportar")}
       >
-        <h2>Uma cópia dos seus dados</h2>
+        <h2>
+          {administrador
+            ? "Exportação administrativa"
+            : "Uma cópia dos seus dados"}
+        </h2>
         <p>
-          Baixe seu perfil, papéis, reservas e o registro das suas notificações
-          em JSON. A instituição registra a exportação para proteger seus dados.
+          {administrador
+            ? "Exporte os dados da conta solicitada em JSON. A operação é registrada na auditoria."
+            : "Baixe seu perfil, papéis, reservas e o registro das suas notificações em JSON. A instituição registra a exportação para proteger seus dados."}
         </p>
         {administrador && (
           <label>
-            ID de outro usuário (opcional)
+            ID do usuário para exportação
             <input
               className="input"
               name="usuario_id"
-              placeholder="Deixe vazio para exportar seus próprios dados"
+              placeholder="UUID completo"
+              minLength={36}
               maxLength={36}
+              required
             />
           </label>
         )}
