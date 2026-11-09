@@ -1,5 +1,23 @@
-import { describe, expect, it } from "vitest";
-import { laboratorioCompletoSchema } from "@/lib/schemas";
+import { describe, expect, it, vi } from "vitest";
+import { editarLaboratorioCompletoAction } from "@/lib/actions-cadastros";
+import {
+  laboratorioCompletoSchema,
+  laboratorioEdicaoFormularioSchema,
+  laboratorioEdicaoSchema,
+  laboratorioEdicaoSnapshotSchema,
+} from "@/lib/schemas";
+
+const mocks = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  revalidatePath: vi.fn(),
+}));
+vi.mock("@/lib/auth", () => ({
+  requireUser: async () => ({ roles: ["admin"] }),
+}));
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => ({ rpc: mocks.rpc }),
+}));
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 
 const laboratorio = {
   nome: "Laboratório de testes",
@@ -131,4 +149,109 @@ describe("cadastro integrado do laboratório", () => {
       }).success,
     ).toBe(false);
   });
+});
+
+describe("leitura e edição do laboratório", () => {
+  const labId = "00000000-0000-4000-8000-000000000001";
+  const janelaId = "00000000-0000-4000-8000-000000000002";
+  const { janelas, equipamentos, ...dados } = laboratorio;
+  const janela = {
+    ...janelas[0],
+    id: janelaId,
+    laboratorio_id: labId,
+    inicio: "08:00:30.123456",
+    fim: "24:00:00",
+  };
+  const leitura = {
+    laboratorio: { ...dados, id: labId },
+    janelas: [janela],
+    equipamentos: [],
+    revisao: "a".repeat(64),
+    total_janelas: 1,
+    total_equipamentos: 0,
+  };
+
+  it("mantém literalmente horários legados no retrato recebido do banco", () => {
+    const dados = laboratorioEdicaoSnapshotSchema.parse(leitura);
+    expect(dados.janelas[0]).toEqual(janela);
+  });
+
+  it("recusa retrato parcial, com duplicatas ou com dados de outro laboratório", () => {
+    for (const invalido of [
+      { ...leitura, janelas: [] },
+      { ...leitura, total_equipamentos: 1 },
+      { ...leitura, janelas: [janela, janela], total_janelas: 2 },
+      { ...leitura, janelas: [{ ...janela, laboratorio_id: janelaId }] },
+    ]) {
+      expect(laboratorioEdicaoSnapshotSchema.safeParse(invalido).success).toBe(
+        false,
+      );
+    }
+  });
+
+  it("permite abrir cadastro legado sem sujeitar a leitura aos limites de criação", () => {
+    const campo = {
+      ...janelas[0],
+      id: janelaId,
+      inicio: janela.inicio,
+      fim: janela.fim,
+    };
+    for (const horarios of [[], Array.from({ length: 51 }, () => campo)]) {
+      expect(
+        laboratorioEdicaoFormularioSchema.safeParse({
+          ...dados,
+          id: labId,
+          janelas: horarios,
+          equipamentos,
+        }).success,
+      ).toBe(true);
+    }
+  });
+
+  it("exige revisão e impede que um horário persistido seja enviado como novo", () => {
+    const edicao = {
+      id: labId,
+      revisao: leitura.revisao,
+      laboratorio: dados,
+      janelas: { manter: [janelaId], alterar: [], novas: [], remover: [] },
+      equipamentos: [],
+    };
+    expect(laboratorioEdicaoSchema.safeParse(edicao).success).toBe(true);
+    expect(
+      laboratorioEdicaoSchema.safeParse({ ...edicao, revisao: "" }).success,
+    ).toBe(false);
+    expect(
+      laboratorioEdicaoSchema.safeParse({
+        ...edicao,
+        janelas: {
+          ...edicao.janelas,
+          novas: [{ ...janelas[0], id: janelaId }],
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([0, 504])(
+    "pede recarga quando o transporte não confirma a gravação (%i)",
+    async (status) => {
+      mocks.revalidatePath.mockClear();
+      mocks.rpc.mockResolvedValueOnce({
+        data: null,
+        error: { code: "", message: "Resposta não recebida" },
+        status,
+      });
+      const resultado = await editarLaboratorioCompletoAction({
+        id: labId,
+        revisao: leitura.revisao,
+        laboratorio: dados,
+        janelas: { manter: [janelaId], alterar: [], novas: [], remover: [] },
+        equipamentos: [],
+      });
+      expect(resultado).toMatchObject({
+        ok: false,
+        codigo: "RESULTADO_NAO_CONFIRMADO",
+      });
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    },
+  );
 });

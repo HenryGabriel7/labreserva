@@ -224,6 +224,28 @@ test("navegação institucional, formulário e operações da demonstração som
   ).toBeDisabled();
 });
 
+test("editor de laboratório na demonstração carrega os períodos e bloqueia a gravação", async ({
+  page,
+}) => {
+  await page.goto("/admin/laboratorios");
+  const cadastro = page.locator(".crud-list-item").filter({
+    has: page.getByText("Laboratório de Redes", { exact: true }),
+  });
+  await cadastro.getByRole("button", { name: "Editar cadastro" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Editar laboratório", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Nome do laboratório")).toHaveValue(
+    "Laboratório de Redes",
+  );
+  await expect(
+    page.getByRole("heading", { name: /^Período \d+$/ }),
+  ).toHaveCount(5);
+  await expect(
+    page.getByRole("button", { name: "Salvar laboratório", exact: true }),
+  ).toBeDisabled();
+});
+
 test("troca entre o portal e a administração pelo cabeçalho", async ({
   page,
 }) => {

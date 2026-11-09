@@ -10,15 +10,19 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Save, Trash2 } from "lucide-react";
-import { salvarLaboratorioCompletoAction } from "@/lib/actions-cadastros";
+import {
+  editarLaboratorioCompletoAction,
+  salvarLaboratorioCompletoAction,
+} from "@/lib/actions-cadastros";
 import {
   laboratorioCompletoSchema,
-  type LaboratorioCompleto,
+  laboratorioEdicaoFormularioSchema,
+  type LaboratorioEdicaoFormulario,
 } from "@/lib/schemas";
 import {
   tiposLaboratorio,
   nomeTipo,
-  type Laboratorio,
+  type LaboratorioEdicao,
   type Equipamento,
   type JanelaHorario,
 } from "@/lib/types";
@@ -32,23 +36,58 @@ const dias = [
   "Sexta-feira",
   "Sábado",
 ];
+
+function horaParaFormulario(hora: string) {
+  return /^\d{2}:\d{2}:00$/.test(hora) ? hora.slice(0, 5) : hora;
+}
+
+function janelaParaFormulario(janela: JanelaHorario) {
+  return {
+    id: janela.id,
+    dia_semana: janela.dia_semana,
+    inicio: horaParaFormulario(janela.inicio),
+    fim: horaParaFormulario(janela.fim),
+    duracao_slot_minutos: janela.duracao_slot_minutos,
+  };
+}
+
+function equipamentoParaFormulario(equipamento: Equipamento) {
+  return {
+    id: equipamento.id,
+    nome: equipamento.nome,
+    patrimonio: equipamento.patrimonio,
+    quantidade: equipamento.quantidade,
+    status: equipamento.status,
+    reservavel_individualmente: equipamento.reservavel_individualmente,
+  };
+}
+
+function horarioLegado(hora: string) {
+  return hora.startsWith("24:") || hora.length > 5;
+}
+
 export function LaboratorioForm({
-  laboratorio,
-  janelas,
-  equipamentos,
+  edicao,
   demonstracao,
+  bloqueado,
+  onRecarregar,
   onSaved,
 }: {
-  laboratorio?: Laboratorio;
-  janelas: JanelaHorario[];
-  equipamentos: Equipamento[];
+  edicao?: LaboratorioEdicao;
   demonstracao: boolean;
+  bloqueado: boolean;
+  onRecarregar: () => void;
   onSaved: (id: string, mensagem: string) => void;
 }) {
+  const laboratorio = edicao?.laboratorio;
+  const janelas = edicao?.janelas ?? [];
+  const equipamentos = edicao?.equipamentos ?? [];
   const [pending, startTransition] = useTransition();
   const [resultado, setResultado] = useState<string | null>(null);
+  const [recargaObrigatoria, setRecargaObrigatoria] = useState(false);
+  const [janelasRemovidas, setJanelasRemovidas] = useState<string[]>([]);
   const [equipamentosRetirados, setEquipamentosRetirados] = useState<
-    LaboratorioCompleto["equipamentos"]
+    LaboratorioEdicaoFormulario["equipamentos"]
   >([]);
   const {
     register,
@@ -58,8 +97,10 @@ export function LaboratorioForm({
     getFieldState,
     getValues,
     formState,
-  } = useForm<LaboratorioCompleto>({
-    resolver: zodResolver(laboratorioCompletoSchema),
+  } = useForm<LaboratorioEdicaoFormulario>({
+    resolver: zodResolver(
+      edicao ? laboratorioEdicaoFormularioSchema : laboratorioCompletoSchema,
+    ),
     defaultValues: {
       ...(laboratorio
         ? {
@@ -90,26 +131,14 @@ export function LaboratorioForm({
             duracao_maxima_minutos: 240,
           }),
       janelas: laboratorio
-        ? janelas.map((j) => ({
-            dia_semana: j.dia_semana,
-            inicio: j.inicio.slice(0, 5),
-            fim: j.fim.slice(0, 5),
-            duracao_slot_minutos: j.duracao_slot_minutos,
-          }))
+        ? janelas.map(janelaParaFormulario)
         : [1, 2, 3, 4, 5].map((dia_semana) => ({
             dia_semana,
             inicio: "08:00",
             fim: "18:00",
             duracao_slot_minutos: 60,
           })),
-      equipamentos: equipamentos.map((e) => ({
-        id: e.id,
-        nome: e.nome,
-        patrimonio: e.patrimonio,
-        quantidade: e.quantidade,
-        status: e.status,
-        reservavel_individualmente: e.reservavel_individualmente,
-      })),
+      equipamentos: equipamentos.map(equipamentoParaFormulario),
     },
   });
   const horarios = useFieldArray({
@@ -123,7 +152,8 @@ export function LaboratorioForm({
     keyName: "chave",
   });
   const modo = useWatch({ control, name: "modo_reserva" });
-  function erro(name: FieldPath<LaboratorioCompleto>) {
+  const desabilitado = demonstracao || pending || bloqueado;
+  function erro(name: FieldPath<LaboratorioEdicaoFormulario>) {
     const campo = getFieldState(name, formState).error as
       (FieldError & { root?: FieldError }) | undefined;
     const mensagem = campo?.message ?? campo?.root?.message;
@@ -133,7 +163,7 @@ export function LaboratorioForm({
       </span>
     ) : null;
   }
-  function atributos(name: FieldPath<LaboratorioCompleto>) {
+  function atributos(name: FieldPath<LaboratorioEdicaoFormulario>) {
     return {
       "aria-invalid": Boolean(getFieldState(name, formState).error),
       "aria-describedby": getFieldState(name, formState).error
@@ -141,20 +171,79 @@ export function LaboratorioForm({
         : undefined,
     };
   }
-  function submit(valores: LaboratorioCompleto) {
+  function gravar(valores: LaboratorioEdicaoFormulario) {
+    if (!edicao) return salvarLaboratorioCompletoAction(valores);
+
+    const { id, janelas: periodos, equipamentos: itens, ...campos } = valores;
+    const anteriores = new Map(
+      janelas.map((j) => [j.id, janelaParaFormulario(j)]),
+    );
+    const manter: string[] = [];
+    const alterar: Omit<JanelaHorario, "laboratorio_id">[] = [];
+    const novas: Omit<JanelaHorario, "laboratorio_id" | "id">[] = [];
+
+    for (const { id: janelaId, ...periodo } of periodos) {
+      if (!janelaId) {
+        novas.push(periodo);
+        continue;
+      }
+      const original = anteriores.get(janelaId);
+      if (
+        original &&
+        periodo.dia_semana === original.dia_semana &&
+        periodo.inicio === original.inicio &&
+        periodo.fim === original.fim &&
+        periodo.duracao_slot_minutos === original.duracao_slot_minutos
+      ) {
+        manter.push(janelaId);
+      } else {
+        alterar.push({ id: janelaId, ...periodo });
+      }
+    }
+
+    const inventarioOriginal = new Map(equipamentos.map((e) => [e.id, e]));
+    const equipamentosAlterados = itens.filter((item) => {
+      const original = item.id ? inventarioOriginal.get(item.id) : undefined;
+      return (
+        !original ||
+        item.nome.trim() !== original.nome.trim() ||
+        (item.patrimonio?.trim() || null) !==
+          (original.patrimonio?.trim() || null) ||
+        item.quantidade !== original.quantidade ||
+        item.status !== original.status ||
+        item.reservavel_individualmente !== original.reservavel_individualmente
+      );
+    });
+    return editarLaboratorioCompletoAction({
+      id,
+      revisao: edicao.revisao,
+      laboratorio: campos,
+      janelas: { manter, alterar, novas, remover: janelasRemovidas },
+      equipamentos: [...equipamentosAlterados, ...equipamentosRetirados],
+    });
+  }
+
+  function submit(valores: LaboratorioEdicaoFormulario) {
+    if (desabilitado || recargaObrigatoria) return;
     setResultado(null);
     startTransition(async () => {
       try {
-        const r = await salvarLaboratorioCompletoAction({
-          ...valores,
-          equipamentos: [...valores.equipamentos, ...equipamentosRetirados],
-        });
+        const r = await gravar(valores);
         if (!r.ok) {
           setResultado(r.mensagem);
+          if (
+            edicao &&
+            "codigo" in r &&
+            (r.codigo === "REVISAO_DESATUALIZADA" ||
+              r.codigo === "FUNCIONAMENTO_INCOMPLETO" ||
+              r.codigo === "RESULTADO_NAO_CONFIRMADO")
+          ) {
+            setRecargaObrigatoria(true);
+          }
           let primeiro = true;
           for (const [campo, mensagem] of Object.entries(r.campos)) {
             setError(
-              campo as FieldPath<LaboratorioCompleto>,
+              campo as FieldPath<LaboratorioEdicaoFormulario>,
               { message: mensagem },
               { shouldFocus: primeiro },
             );
@@ -164,7 +253,12 @@ export function LaboratorioForm({
         }
         if (r.id) onSaved(r.id, r.mensagem);
       } catch {
-        setResultado("Não foi possível salvar o laboratório. Tente novamente.");
+        if (edicao) setRecargaObrigatoria(true);
+        setResultado(
+          edicao
+            ? "Não foi possível confirmar o salvamento. Recarregue os dados antes de tentar novamente."
+            : "Não foi possível confirmar a criação. Confira a lista antes de tentar novamente.",
+        );
       }
     });
   }
@@ -188,10 +282,22 @@ export function LaboratorioForm({
           {resultado}
         </div>
       )}
-      <fieldset
-        disabled={demonstracao || pending}
-        className="cadastro-fieldset"
-      >
+      {recargaObrigatoria && (
+        <>
+          <p className="cadastro-help">
+            O rascunho ficará disponível até os dados atuais serem carregados.
+          </p>
+          <button
+            type="button"
+            className="button button-outline"
+            disabled={desabilitado}
+            onClick={onRecarregar}
+          >
+            Recarregar dados
+          </button>
+        </>
+      )}
+      <fieldset disabled={desabilitado} className="cadastro-fieldset">
         <legend>Informações do laboratório</legend>
         <div className="form-grid">
           <label className="full">
@@ -307,15 +413,18 @@ export function LaboratorioForm({
           </label>
         </div>
       </fieldset>
-      <fieldset
-        disabled={demonstracao || pending}
-        className="cadastro-fieldset"
-      >
+      <fieldset disabled={desabilitado} className="cadastro-fieldset">
         <legend>Horários de funcionamento</legend>
         <p className="cadastro-help">
           Horário de Brasília. Adicione pelo menos um período. Para fechar o
           intervalo de almoço, cadastre dois períodos no mesmo dia.
         </p>
+        {edicao?.total_janelas === 0 && horarios.fields.length === 0 && (
+          <p className="cadastro-warning">
+            Sem funcionamento cadastrado. Adicione um período para permitir
+            agendamentos.
+          </p>
+        )}
         {erro("janelas")}
         <div className="cadastro-repeat-list">
           {horarios.fields.map((janela, i) => (
@@ -325,13 +434,23 @@ export function LaboratorioForm({
                 <button
                   type="button"
                   className="button button-ghost button-sm"
-                  onClick={() => horarios.remove(i)}
+                  onClick={() => {
+                    const id = janela.id;
+                    if (id) setJanelasRemovidas((ids) => [...ids, id]);
+                    horarios.remove(i);
+                  }}
                   aria-label={`Remover período ${i + 1}`}
                 >
                   <Trash2 size={14} />
                   <span>Remover</span>
                 </button>
               </div>
+              {(horarioLegado(janela.inicio) || horarioLegado(janela.fim)) && (
+                <p className="cadastro-help">
+                  Período legado. Ao alterar este período, informe os horários
+                  em HH:mm.
+                </p>
+              )}
               <div className="form-grid">
                 <label className="full">
                   Dia da semana
@@ -354,7 +473,7 @@ export function LaboratorioForm({
                   Abertura
                   <input
                     className="input"
-                    type="time"
+                    type={horarioLegado(janela.inicio) ? "text" : "time"}
                     {...register(`janelas.${i}.inicio`)}
                     {...atributos(`janelas.${i}.inicio`)}
                   />
@@ -364,7 +483,7 @@ export function LaboratorioForm({
                   Encerramento
                   <input
                     className="input"
-                    type="time"
+                    type={horarioLegado(janela.fim) ? "text" : "time"}
                     {...register(`janelas.${i}.fim`)}
                     {...atributos(`janelas.${i}.fim`)}
                   />
@@ -410,16 +529,14 @@ export function LaboratorioForm({
           Adicionar horário
         </button>
       </fieldset>
-      <fieldset
-        disabled={demonstracao || pending}
-        className="cadastro-fieldset"
-      >
+      <fieldset disabled={desabilitado} className="cadastro-fieldset">
         <legend>Equipamentos do laboratório</legend>
         <p className="cadastro-help">
           Adicione os equipamentos disponíveis neste espaço. O patrimônio é
           opcional e precisa ser único. Itens removidos ficam inativos para
           preservar o histórico.
         </p>
+        {erro("equipamentos")}
         {inventario.fields.length === 0 && (
           <p className="cadastro-help">Nenhum equipamento adicionado.</p>
         )}
@@ -436,16 +553,11 @@ export function LaboratorioForm({
                     const salvo = equipamentos.find(
                       (item) => item.id === equipamento.id,
                     );
-                    if (salvo)
+                    if (salvo && salvo.status !== "inativo")
                       setEquipamentosRetirados((itens) => [
                         ...itens,
                         {
-                          id: salvo.id,
-                          nome: salvo.nome,
-                          patrimonio: salvo.patrimonio,
-                          quantidade: salvo.quantidade,
-                          reservavel_individualmente:
-                            salvo.reservavel_individualmente,
+                          ...equipamentoParaFormulario(salvo),
                           status: "inativo",
                         },
                       ]);
@@ -535,7 +647,7 @@ export function LaboratorioForm({
         </button>
       </fieldset>
       <button
-        disabled={demonstracao || pending}
+        disabled={desabilitado || recargaObrigatoria}
         className="button button-primary cadastro-save"
         type="submit"
       >

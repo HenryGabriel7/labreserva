@@ -58,6 +58,84 @@ describe.skipIf(!ambienteLocal)(
       ).toHaveLength(7);
     });
 
+    it("duas sessões editando o mesmo retrato preservam apenas a primeira gravação", async () => {
+      const servico = clienteServico();
+      const [adminA, adminB, lab] = await Promise.all([
+        criarPessoa("admin", servico),
+        criarPessoa("admin", servico),
+        criarLaboratorio(servico),
+      ]);
+      const admins = [adminA, adminB];
+      const retratos = await Promise.all(
+        admins.map(async ({ cliente }) => {
+          const retrato = exigirSucesso(
+            await cliente.rpc("obter_laboratorio_edicao", { p_id: lab.id }),
+            "Carregar o retrato em uma sessão independente",
+          ) as { revisao: string; janelas: { id: string }[] };
+          expect(retrato.janelas).toHaveLength(7);
+          return retrato;
+        }),
+      );
+      expect(retratos[0].revisao).toBeTruthy();
+      expect(retratos[0]).toEqual(retratos[1]);
+      const mudancas = [
+        { nome: `Primeira proposta ${lab.id}`, dia_semana: 5 },
+        { nome: `Segunda proposta ${lab.id}`, dia_semana: 6 },
+      ];
+      const respostas = await Promise.all(
+        admins.map(({ cliente }, indice) =>
+          cliente.rpc("editar_laboratorio_completo", {
+            p_id: lab.id,
+            p_revisao: retratos[indice].revisao,
+            p_dados: { nome: mudancas[indice].nome },
+            p_janelas: {
+              manter: retratos[indice].janelas.map((j) => j.id),
+              alterar: [],
+              novas: [
+                {
+                  dia_semana: mudancas[indice].dia_semana,
+                  inicio: "22:00",
+                  fim: "23:00",
+                  duracao_slot_minutos: 60,
+                },
+              ],
+              remover: [],
+            },
+            p_equipamentos: [],
+          }),
+        ),
+      );
+      expect(respostas.filter(({ error }) => error === null)).toHaveLength(1);
+      const vencedor = respostas.findIndex(({ error }) => error === null);
+      expect(respostas[1 - vencedor].error).toMatchObject({
+        code: "P0001",
+        message: "REVISAO_DESATUALIZADA",
+      });
+      const dados = exigirSucesso(
+        await servico
+          .from("laboratorios")
+          .select("nome")
+          .eq("id", lab.id)
+          .single(),
+        "Conferir o nome vencedor",
+      );
+      expect(dados.nome).toBe(mudancas[vencedor].nome);
+      const janelas = exigirSucesso(
+        await servico
+          .from("janelas_horario")
+          .select("id,dia_semana,inicio")
+          .eq("laboratorio_id", lab.id),
+        "Conferir os horários persistidos",
+      );
+      expect(janelas).toHaveLength(8);
+      expect(janelas.map((j) => j.id)).toEqual(
+        expect.arrayContaining(retratos[0].janelas.map((j) => j.id)),
+      );
+      expect(janelas.filter((j) => j.inicio === "22:00:00")).toEqual([
+        expect.objectContaining({ dia_semana: mudancas[vencedor].dia_semana }),
+      ]);
+    });
+
     it("signUp direto com chave pública é recusado pelo Auth", async () => {
       const local = configuracaoLocal();
       if (!local) throw new Error(motivoSemSupabase);

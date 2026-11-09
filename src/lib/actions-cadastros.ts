@@ -6,6 +6,7 @@ import { createClient } from "./supabase/server";
 import {
   laboratorioSchema,
   laboratorioCompletoSchema,
+  laboratorioEdicaoSchema,
   equipamentoSchema,
   janelaSchema,
   bloqueioSchema,
@@ -35,7 +36,84 @@ async function salvar(
 export async function salvarLaboratorioAction(dados: unknown) {
   return salvar(laboratorioSchema, dados, "salvar_laboratorio");
 }
-export async function salvarLaboratorioCompletoAction(dados: unknown) {
+
+type ResultadoLaboratorio = {
+  ok: boolean;
+  mensagem: string;
+  campos: Record<string, string>;
+  id?: string;
+  codigo?: string;
+};
+
+const resultadoNaoConfirmado: ResultadoLaboratorio = {
+  ok: false,
+  mensagem:
+    "Não foi possível confirmar o salvamento. Recarregue os dados do laboratório antes de tentar novamente.",
+  campos: {},
+  codigo: "RESULTADO_NAO_CONFIRMADO",
+};
+
+const mensagensLaboratorio: Record<string, string> = {
+  REVISAO_OBRIGATORIA:
+    "Abra o editor atualizado do laboratório antes de salvar alterações.",
+  REVISAO_DESATUALIZADA:
+    "Alguém alterou este laboratório depois que você abriu o editor. Carregue os dados atuais e revise suas alterações antes de salvar.",
+  FUNCIONAMENTO_INCOMPLETO:
+    "A edição não inclui todos os horários existentes. Recarregue os dados do laboratório.",
+  FUNCIONAMENTO_OBRIGATORIO: "Adicione pelo menos um horário de funcionamento.",
+  FUNCIONAMENTO_INCOMPATIVEL:
+    "O funcionamento precisa comportar uma reserva dentro da duração mínima e máxima.",
+  JANELAS_SOBREPOSTAS:
+    "Os horários de funcionamento do mesmo dia não podem se sobrepor.",
+  EQUIPAMENTO_OUTRO_LABORATORIO:
+    "Um equipamento não pertence a este laboratório. Atualize a página.",
+  EQUIPAMENTO_DUPLICADO: "Um equipamento foi informado mais de uma vez.",
+  "23505":
+    "Um patrimônio já está cadastrado. Confira os patrimônios dos equipamentos.",
+  FORA_DA_JANELA:
+    "Há reservas aprovadas fora do novo funcionamento. Mantenha esses horários ou resolva as reservas antes de alterar o laboratório.",
+  DURACAO_INVALIDA:
+    "Há reservas aprovadas com uma duração incompatível com os novos limites. Revise os limites antes de salvar.",
+  EQUIPAMENTO_INDISPONIVEL:
+    "Um equipamento alterado é necessário para uma reserva aprovada. Mantenha sua disponibilidade ou resolva a reserva antes de alterar.",
+  CAPACIDADE_INVALIDA:
+    "A nova capacidade é menor que a quantidade de participantes de uma reserva aprovada.",
+};
+
+function erroLaboratorio(erro: {
+  code?: string;
+  message: string;
+}): ResultadoLaboratorio {
+  const codigo = [erro.message, erro.code].find(
+    (valor) => valor && Object.hasOwn(mensagensLaboratorio, valor),
+  );
+  return {
+    ok: false,
+    mensagem: codigo ? mensagensLaboratorio[codigo] : mensagemErro(erro),
+    campos: {},
+    codigo,
+  };
+}
+
+function laboratorioSalvo(
+  data: unknown,
+  idEsperado?: string,
+): ResultadoLaboratorio {
+  const salvo = z.object({ id: z.uuid() }).safeParse(data);
+  if (!salvo.success || (idEsperado && salvo.data.id !== idEsperado))
+    return resultadoNaoConfirmado;
+  revalidatePath("/", "layout");
+  return {
+    ok: true,
+    mensagem: "Laboratório, funcionamento e equipamentos salvos com sucesso.",
+    id: salvo.data.id,
+    campos: {},
+  };
+}
+
+export async function salvarLaboratorioCompletoAction(
+  dados: unknown,
+): Promise<ResultadoLaboratorio> {
   await requireUser(["admin"], { sensitive: true });
   const parsed = laboratorioCompletoSchema.safeParse(dados);
   if (!parsed.success)
@@ -47,51 +125,48 @@ export async function salvarLaboratorioCompletoAction(dados: unknown) {
       ),
     };
   const { id, janelas, equipamentos, ...laboratorio } = parsed.data;
+  if (id) return erroLaboratorio({ message: "REVISAO_OBRIGATORIA" });
   const db = await createClient();
   const { data, error } = await db.rpc("salvar_laboratorio_completo", {
-    p_id: id ?? null,
+    p_id: null,
     p_dados: laboratorio,
     p_janelas: janelas,
     p_equipamentos: equipamentos,
   });
-  if (error) {
-    const mensagens: Record<string, string> = {
-      FUNCIONAMENTO_OBRIGATORIO:
-        "Adicione pelo menos um horário de funcionamento.",
-      FUNCIONAMENTO_INCOMPATIVEL:
-        "O funcionamento precisa comportar uma reserva dentro da duração mínima e máxima.",
-      JANELAS_SOBREPOSTAS:
-        "Os horários de funcionamento do mesmo dia não podem se sobrepor.",
-      EQUIPAMENTO_OUTRO_LABORATORIO:
-        "Um equipamento não pertence a este laboratório. Atualize a página.",
-      EQUIPAMENTO_DUPLICADO: "Um equipamento foi informado mais de uma vez.",
-      "23505":
-        "Um patrimônio já está cadastrado. Confira os patrimônios dos equipamentos.",
-      FORA_DA_JANELA:
-        "Há reservas aprovadas fora do novo funcionamento. Mantenha esses horários ou resolva as reservas antes de alterar o laboratório.",
-      DURACAO_INVALIDA:
-        "Há reservas aprovadas com uma duração incompatível com os novos limites. Revise os limites antes de salvar.",
-      EQUIPAMENTO_INDISPONIVEL:
-        "Um equipamento alterado é necessário para uma reserva aprovada. Mantenha sua disponibilidade ou resolva a reserva antes de alterar.",
-      CAPACIDADE_INVALIDA:
-        "A nova capacidade é menor que a quantidade de participantes de uma reserva aprovada.",
-    };
+  return error ? erroLaboratorio(error) : laboratorioSalvo(data);
+}
+
+export async function editarLaboratorioCompletoAction(
+  dados: unknown,
+): Promise<ResultadoLaboratorio> {
+  await requireUser(["admin"], { sensitive: true });
+  const parsed = laboratorioEdicaoSchema.safeParse(dados);
+  if (!parsed.success)
     return {
       ok: false,
       mensagem:
-        mensagens[error.message] ??
-        mensagens[error.code] ??
-        mensagemErro(error),
-      campos: {} as Record<string, string>,
+        "Revise os horários, equipamentos e dados do laboratório antes de salvar.",
+      campos: Object.fromEntries(
+        parsed.error.issues
+          .filter((erro) =>
+            ["laboratorio", "janelas", "equipamentos"].includes(
+              String(erro.path[0]),
+            ),
+          )
+          .map((erro) => [erro.path.join("."), erro.message]),
+      ),
     };
-  }
-  revalidatePath("/", "layout");
-  return {
-    ok: true,
-    mensagem: "Laboratório, funcionamento e equipamentos salvos com sucesso.",
-    id: (data as { id: string }).id,
-    campos: {} as Record<string, string>,
-  };
+  const { id, revisao, laboratorio, janelas, equipamentos } = parsed.data;
+  const db = await createClient();
+  const { data, error, status } = await db.rpc("editar_laboratorio_completo", {
+    p_id: id,
+    p_revisao: revisao,
+    p_dados: laboratorio,
+    p_janelas: janelas,
+    p_equipamentos: equipamentos,
+  });
+  if (error && (status === 0 || status >= 500)) return resultadoNaoConfirmado;
+  return error ? erroLaboratorio(error) : laboratorioSalvo(data, id);
 }
 export async function salvarEquipamentoAction(dados: unknown) {
   return salvar(equipamentoSchema, dados, "salvar_equipamento");

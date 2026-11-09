@@ -1,5 +1,5 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { Pencil, Trash2, Plus, Save } from "lucide-react";
 import {
@@ -8,7 +8,13 @@ import {
   salvarJanelaAction,
   removerCadastroAction,
 } from "@/lib/actions-cadastros";
-import type { Laboratorio, Equipamento, JanelaHorario } from "@/lib/types";
+import { laboratorioEdicaoSnapshotSchema } from "@/lib/schemas";
+import type {
+  Laboratorio,
+  Equipamento,
+  JanelaHorario,
+  LaboratorioEdicao,
+} from "@/lib/types";
 import { tiposLaboratorio, nomeTipo } from "@/lib/types";
 import { LaboratorioForm } from "./laboratorio-form";
 type Campo = {
@@ -18,6 +24,7 @@ type Campo = {
   opcoes?: { valor: string; label: string }[];
 };
 type Tab = "laboratorios" | "equipamentos" | "janelas_horario";
+type SelecaoCadastro = { tab: Tab; id: string | null };
 export function AdminCadastros({
   laboratorios,
   equipamentos,
@@ -29,8 +36,12 @@ export function AdminCadastros({
   janelas: JanelaHorario[];
   demonstracao: boolean;
 }) {
-  const [tab, setTab] = useState<Tab>("laboratorios");
-  const [editando, setEditando] = useState<string | null>(null);
+  const [selecao, setSelecao] = useState<SelecaoCadastro>({
+    tab: "laboratorios",
+    id: null,
+  });
+  const selecaoAtual = useRef(selecao);
+  const { tab, id: editando } = selecao;
   const [mensagem, setMensagem] = useState("");
   const [pendente, startTransition] = useTransition();
   const lista =
@@ -41,6 +52,10 @@ export function AdminCadastros({
         : janelas;
   const selecionado = lista.find((i) => i.id === editando) as unknown as
     Record<string, unknown> | undefined;
+  const laboratorioDemo =
+    demonstracao && tab === "laboratorios"
+      ? laboratorios.find((lab) => lab.id === editando)
+      : undefined;
   const labOpcoes = laboratorios.map((l) => ({ valor: l.id, label: l.nome }));
   const campos: Campo[] =
     tab === "laboratorios"
@@ -164,6 +179,14 @@ export function AdminCadastros({
       selecionado?.[c.name] ?? (padrao as Record<string, unknown>)[c.name],
     ]),
   );
+  function selecionar(aba: Tab, id: string | null) {
+    if (selecaoAtual.current.tab === aba && selecaoAtual.current.id === id)
+      return;
+    const proxima = { tab: aba, id };
+    selecaoAtual.current = proxima;
+    setSelecao(proxima);
+  }
+
   async function remover(id: string) {
     setMensagem("");
     if (
@@ -193,8 +216,7 @@ export function AdminCadastros({
             className={`button ${tab === t ? "button-primary" : "button-ghost"}`}
             key={t}
             onClick={() => {
-              setTab(t);
-              setEditando(null);
+              selecionar(t, null);
               setMensagem("");
             }}
           >
@@ -219,7 +241,7 @@ export function AdminCadastros({
             <h2>Cadastros existentes</h2>
             <button
               className="button button-ghost button-sm"
-              onClick={() => setEditando(null)}
+              onClick={() => selecionar(tab, null)}
             >
               <Plus size={13} />
               Novo
@@ -240,20 +262,14 @@ export function AdminCadastros({
                       : laboratorios.find((l) => l.id === item.laboratorio_id)
                           ?.nome}
                   </small>
-                  {tab === "laboratorios" &&
-                    !janelas.some(
-                      (janela) => janela.laboratorio_id === item.id,
-                    ) && (
-                      <span className="cadastro-warning">
-                        Sem funcionamento cadastrado. Edite para permitir
-                        agendamentos.
-                      </span>
-                    )}
                 </div>
                 <div>
                   <button
                     className="button button-ghost button-sm"
-                    onClick={() => setEditando(item.id)}
+                    onClick={() => {
+                      selecionar(tab, item.id);
+                      setMensagem("");
+                    }}
                     aria-label="Editar cadastro"
                   >
                     <Pencil size={14} />
@@ -272,24 +288,21 @@ export function AdminCadastros({
             ))}
           </div>
         </section>
-        {tab === "laboratorios" && editando && !selecionado ? (
-          <section className="panel crud-form" role="status">
-            Carregando os dados do laboratório salvo…
-          </section>
-        ) : tab === "laboratorios" ? (
-          <LaboratorioForm
+        {tab === "laboratorios" ? (
+          <EditorLaboratorio
             key={`laboratorio-${editando}`}
-            laboratorio={laboratorios.find((lab) => lab.id === editando)}
-            janelas={janelas.filter(
-              (janela) => janela.laboratorio_id === editando,
-            )}
-            equipamentos={equipamentos.filter(
-              (equipamento) => equipamento.laboratorio_id === editando,
-            )}
+            id={editando}
+            dadosDemo={
+              laboratorioDemo
+                ? montarDadosDemo(laboratorioDemo, janelas, equipamentos)
+                : undefined
+            }
             demonstracao={demonstracao}
             onSaved={(id, mensagem) => {
-              setEditando(id);
+              if (selecaoAtual.current !== selecao) return false;
+              selecionar("laboratorios", id);
               setMensagem(mensagem);
+              return true;
             }}
           />
         ) : (
@@ -306,6 +319,157 @@ export function AdminCadastros({
     </>
   );
 }
+
+function montarDadosDemo(
+  laboratorio: Laboratorio,
+  janelas: JanelaHorario[],
+  equipamentos: Equipamento[],
+): LaboratorioEdicao {
+  const horarios = janelas.filter((j) => j.laboratorio_id === laboratorio.id);
+  const inventario = equipamentos.filter(
+    (e) => e.laboratorio_id === laboratorio.id,
+  );
+  return {
+    laboratorio,
+    janelas: horarios,
+    equipamentos: inventario,
+    revisao: "0".repeat(64),
+    total_janelas: horarios.length,
+    total_equipamentos: inventario.length,
+  };
+}
+
+type LeituraLaboratorio = {
+  tentativa: number;
+  ultimo?: { tentativa: number; dados: LaboratorioEdicao };
+  erro?: string;
+};
+
+function EditorLaboratorio({
+  id,
+  dadosDemo,
+  demonstracao,
+  onSaved,
+}: {
+  id: string | null;
+  dadosDemo?: LaboratorioEdicao;
+  demonstracao: boolean;
+  onSaved: (id: string, mensagem: string) => boolean;
+}) {
+  const [tentativa, setTentativa] = useState(0);
+  const [leitura, setLeitura] = useState<LeituraLaboratorio>();
+  const carregar = () => setTentativa((n) => n + 1);
+
+  useEffect(() => {
+    if (!id || demonstracao) return;
+    const url = `/api/admin/laboratorios/${encodeURIComponent(id)}`;
+    const controlador = new AbortController();
+    const { signal } = controlador;
+    const limite = setTimeout(() => controlador.abort(), 15_000);
+    let cancelada = false;
+
+    const falhar = (erro: string) => {
+      if (!cancelada)
+        setLeitura((anterior) => ({
+          tentativa,
+          ultimo: anterior?.ultimo,
+          erro,
+        }));
+    };
+
+    async function consultar() {
+      try {
+        const resposta = await fetch(url, {
+          cache: "no-store",
+          redirect: "error",
+          signal,
+        });
+        if (!resposta.ok) {
+          const mensagens: Record<number, string> = {
+            401: "Sua sessão expirou. Entre novamente para editar.",
+            403: "Seu perfil não tem permissão para editar este laboratório.",
+            404: "O laboratório não foi encontrado.",
+          };
+          falhar(
+            mensagens[resposta.status] ??
+              "Não foi possível carregar os dados do laboratório.",
+          );
+          return;
+        }
+        const validado = laboratorioEdicaoSnapshotSchema.safeParse(
+          await resposta.json(),
+        );
+        if (!validado.success || validado.data.laboratorio.id !== id) {
+          falhar("Os dados recebidos do laboratório estão incompletos.");
+          return;
+        }
+        if (!cancelada)
+          setLeitura({
+            tentativa,
+            ultimo: { tentativa, dados: validado.data },
+          });
+      } catch {
+        falhar("Não foi possível carregar os dados do laboratório.");
+      } finally {
+        clearTimeout(limite);
+      }
+    }
+    void consultar();
+
+    return () => {
+      cancelada = true;
+      clearTimeout(limite);
+      controlador.abort();
+    };
+  }, [id, demonstracao, tentativa]);
+
+  const carregando = Boolean(
+    id && !demonstracao && leitura?.tentativa !== tentativa,
+  );
+  const erro = carregando
+    ? undefined
+    : demonstracao && id && !dadosDemo
+      ? "O laboratório não foi encontrado na demonstração."
+      : leitura?.erro;
+  const edicao = dadosDemo ?? leitura?.ultimo?.dados;
+
+  return (
+    <div className="cadastro-editor">
+      {carregando && (
+        <section className="panel crud-form" role="status">
+          Carregando os dados do laboratório…
+        </section>
+      )}
+      {erro && (
+        <section className="panel crud-form">
+          <p role="alert">{erro}</p>
+          {!demonstracao && (
+            <button
+              type="button"
+              className="button button-outline"
+              onClick={carregar}
+            >
+              Tentar carregar novamente
+            </button>
+          )}
+        </section>
+      )}
+      {(!id || edicao) && (
+        <LaboratorioForm
+          key={leitura?.ultimo?.tentativa ?? "inicial"}
+          edicao={edicao}
+          demonstracao={demonstracao}
+          bloqueado={carregando || Boolean(erro)}
+          onRecarregar={carregar}
+          onSaved={(idSalvo, mensagem) => {
+            if (onSaved(idSalvo, mensagem) && id === idSalvo) carregar();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 function CadastroForm({
   campos,
   iniciais,

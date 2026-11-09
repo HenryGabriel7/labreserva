@@ -267,6 +267,122 @@ test.describe("fluxos reais Supabase local", () => {
     await expect.poll(() => status(id)).toBe("recusada");
   });
 
+  test("editor bloqueia carga com falha ou resposta parcial e permite tentar novamente", async ({
+    page,
+  }) => {
+    const lab = await criarLaboratorio(clienteServico());
+    const url = `**/api/admin/laboratorios/${lab.id}`;
+    await entrar(page, pessoas.admin.email);
+    await page.goto("/admin/laboratorios");
+    await page.route(url, (route) => route.abort(), { times: 1 });
+    await page
+      .locator(".crud-list-item")
+      .filter({ has: page.getByText(lab.nome, { exact: true }) })
+      .getByRole("button", { name: "Editar cadastro" })
+      .click();
+
+    const tentar = page.getByRole("button", {
+      name: "Tentar carregar novamente",
+    });
+    const salvar = page.getByRole("button", { name: "Salvar laboratório" });
+    await expect(tentar).toBeVisible();
+    await expect(salvar).toHaveCount(0);
+
+    await page.route(
+      url,
+      async (route) => {
+        const resposta = await route.fetch();
+        const snapshot = (await resposta.json()) as { janelas: unknown[] };
+        await route.fulfill({
+          response: resposta,
+          json: { ...snapshot, janelas: snapshot.janelas.slice(1) },
+        });
+      },
+      { times: 1 },
+    );
+    await tentar.click();
+    await expect(tentar).toBeVisible();
+    await expect(salvar).toHaveCount(0);
+
+    await tentar.click();
+    await expect(
+      page.getByLabel("Nome do laboratório", { exact: true }),
+    ).toHaveValue(lab.nome);
+    await expect(salvar).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: /^Remover período \d+$/ }),
+    ).toHaveCount(7);
+  });
+
+  test("edição em duas abas conserva a remoção explícita e o rascunho da segunda aba", async ({
+    page,
+    browser,
+  }) => {
+    const servico = clienteServico();
+    const [lab, outroAdmin] = await Promise.all([
+      criarLaboratorio(servico),
+      criarPessoa("admin", servico),
+    ]);
+    const segundaAba = await novaPagina(browser);
+    const janelasSalvas = async () =>
+      exigirSucesso(
+        await servico
+          .from("janelas_horario")
+          .select("id,dia_semana,inicio,fim")
+          .eq("laboratorio_id", lab.id)
+          .order("dia_semana"),
+        "Consultar os horários atuais do laboratório",
+      );
+    const anteriores = await janelasSalvas();
+    expect(anteriores).toHaveLength(7);
+    await Promise.all([
+      entrar(page, pessoas.admin.email),
+      entrar(segundaAba, outroAdmin.email),
+    ]);
+    await Promise.all(
+      [page, segundaAba].map(async (aba) => {
+        await aba.goto("/admin/laboratorios");
+        await aba
+          .locator(".crud-list-item")
+          .filter({ has: aba.getByText(lab.nome, { exact: true }) })
+          .getByRole("button", { name: "Editar cadastro" })
+          .click();
+        await expect(
+          aba.getByLabel("Nome do laboratório", { exact: true }),
+        ).toHaveValue(lab.nome);
+      }),
+    );
+    const nomeA = `QA alteração confirmada ${lab.id}`;
+    const nomeB = `QA rascunho preservado ${lab.id}`;
+    const campoA = page.getByLabel("Nome do laboratório", { exact: true });
+    const campoB = segundaAba.getByLabel("Nome do laboratório", {
+      exact: true,
+    });
+    await campoA.fill(nomeA);
+    await campoB.fill(nomeB);
+    await page
+      .getByRole("button", { name: "Remover período 1", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Salvar laboratório" }).click();
+    await expect.poll(janelasSalvas).toEqual(anteriores.slice(1));
+
+    const salvarB = segundaAba.getByRole("button", {
+      name: "Salvar laboratório",
+    });
+    await salvarB.click();
+    const recarregar = segundaAba.getByRole("button", {
+      name: "Recarregar dados",
+    });
+    await expect(recarregar).toBeVisible();
+    await expect(campoB).toHaveValue(nomeB);
+    await expect(salvarB).toBeDisabled();
+    expect(await janelasSalvas()).toEqual(anteriores.slice(1));
+
+    await recarregar.click();
+    await expect(campoB).toHaveValue(nomeA);
+    await expect(salvarB).toBeEnabled();
+  });
+
   test("monitor agenda no portal de usuário", async ({ page }) => {
     const lab = await criarLaboratorio(clienteServico(), pessoas.monitor.id);
     await entrar(page, pessoas.monitor.email);

@@ -4,11 +4,13 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient, hasSupabaseConfiguration } from "@/lib/supabase/server";
 import { labsDemo, equipamentosDemo, reservasDemo, janelasDemo } from "./demo";
+import { laboratorioEdicaoSnapshotSchema } from "./schemas";
 import type {
   Laboratorio,
   Equipamento,
   Reserva,
   JanelaHorario,
+  LaboratorioEdicao,
   Notificacao,
 } from "./types";
 
@@ -55,6 +57,30 @@ export const getJanelas = cache(async (): Promise<JanelaHorario[]> => {
   if (error) throw new Error("Não foi possível carregar o funcionamento.");
   return data as JanelaHorario[];
 });
+
+type LeituraLaboratorioEdicao =
+  { dados: LaboratorioEdicao } | { status: 403 | 404 | 503; mensagem: string };
+
+export async function getLaboratorioEdicao(
+  id: string,
+): Promise<LeituraLaboratorioEdicao> {
+  const db = await createClient();
+  const { data, error } = await db.rpc("obter_laboratorio_edicao", {
+    p_id: id,
+  });
+  if (error?.message === "REGISTRO_NAO_ENCONTRADO")
+    return { status: 404, mensagem: "Laboratório não encontrado." };
+  if (error?.code === "42501")
+    return { status: 403, mensagem: "Acesso não autorizado." };
+  const resultado = laboratorioEdicaoSnapshotSchema.safeParse(data);
+  if (error || !resultado.success || resultado.data.laboratorio.id !== id)
+    return {
+      status: 503,
+      mensagem: "Não foi possível carregar os dados completos do laboratório.",
+    };
+  return { dados: resultado.data };
+}
+
 export async function getReservas({
   minhas = false,
   pagina = 1,

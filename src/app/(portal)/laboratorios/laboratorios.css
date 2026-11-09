@@ -249,6 +249,11 @@
   margin: 0 0 22px;
   font-weight: 600;
 }
+.cadastro-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
 .checkbox-label {
   display: flex;
   gap: 8px;

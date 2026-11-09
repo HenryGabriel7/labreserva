@@ -1,9 +1,8 @@
 import { z } from "@/lib/validacao";
 import { tiposLaboratorio, papeis } from "./types";
 export const uuidSchema = z.uuid();
-export const laboratorioSchema = z
+const laboratorioCamposSchema = z
   .object({
-    id: uuidSchema.optional(),
     nome: z.string().trim().min(2).max(150),
     tipo: z.enum(tiposLaboratorio),
     capacidade: z.number().int().min(1).max(10000),
@@ -21,6 +20,9 @@ export const laboratorioSchema = z
     message: "Duração máxima precisa ser maior ou igual à mínima",
     path: ["duracao_maxima_minutos"],
   });
+export const laboratorioSchema = laboratorioCamposSchema.safeExtend({
+  id: uuidSchema.optional(),
+});
 export const equipamentoSchema = z
   .object({
     id: uuidSchema.optional(),
@@ -142,6 +144,108 @@ export const laboratorioCompletoSchema = laboratorioSchema
     });
   });
 export type LaboratorioCompleto = z.infer<typeof laboratorioCompletoSchema>;
+
+// A leitura aceita formatos que o PostgreSQL já pode ter persistido, inclusive
+// segundos fracionários e o fim de dia 24:00. A gravação valida alterações.
+const horaPersistidaSchema = z
+  .string()
+  .regex(
+    /^(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?|24:00(?::00)?)$/,
+  );
+const janelaEdicaoFormularioSchema = funcionamentoLaboratorioSchema.extend({
+  id: uuidSchema.optional(),
+  inicio: horaPersistidaSchema,
+  fim: horaPersistidaSchema,
+});
+export const laboratorioEdicaoFormularioSchema = laboratorioSchema.safeExtend({
+  janelas: z.array(janelaEdicaoFormularioSchema),
+  equipamentos: z.array(
+    equipamentoLaboratorioSchema.extend({
+      nome: z.string(),
+      patrimonio: z.string().nullable(),
+    }),
+  ),
+});
+export type LaboratorioEdicaoFormulario = z.infer<
+  typeof laboratorioEdicaoFormularioSchema
+>;
+
+const revisaoLaboratorioSchema = z.string().regex(/^[0-9a-f]{64}$/);
+const laboratorioPersistidoSchema = z.object({
+  ...laboratorioCamposSchema.shape,
+  id: uuidSchema,
+  nome: z.string(),
+  localizacao: z.string(),
+  descricao: z.string(),
+  regras_de_uso: z.string(),
+});
+const janelaPersistidaSchema = z.object({
+  ...janelaEdicaoFormularioSchema.shape,
+  id: uuidSchema,
+  laboratorio_id: uuidSchema,
+});
+const equipamentoPersistidoSchema = z.object({
+  ...equipamentoSchema.shape,
+  id: uuidSchema,
+  nome: z.string(),
+  patrimonio: z.string().nullable(),
+});
+
+export const laboratorioEdicaoSnapshotSchema = z
+  .object({
+    laboratorio: laboratorioPersistidoSchema,
+    janelas: z.array(janelaPersistidaSchema),
+    equipamentos: z.array(equipamentoPersistidoSchema),
+    revisao: revisaoLaboratorioSchema,
+    total_janelas: z.number().int().nonnegative(),
+    total_equipamentos: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine(
+    ({
+      laboratorio,
+      janelas,
+      equipamentos,
+      total_janelas,
+      total_equipamentos,
+    }) =>
+      janelas.length === total_janelas &&
+      equipamentos.length === total_equipamentos &&
+      [janelas, equipamentos].every(
+        (itens) =>
+          new Set(itens.map((item) => item.id)).size === itens.length &&
+          itens.every((item) => item.laboratorio_id === laboratorio.id),
+      ),
+    "A leitura dos horários ou equipamentos está incompleta.",
+  );
+
+const janelaAlteradaSchema = funcionamentoLaboratorioSchema.extend({
+  id: uuidSchema,
+  inicio: z
+    .string()
+    .regex(
+      /^(?:[01]\d|2[0-3]):[0-5]\d(?::00)?$/,
+      "Use horas e minutos, sem segundos.",
+    ),
+  fim: z
+    .string()
+    .regex(
+      /^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)(?::00)?$/,
+      "Use horas e minutos, sem segundos.",
+    ),
+});
+export const laboratorioEdicaoSchema = z.strictObject({
+  id: uuidSchema,
+  revisao: revisaoLaboratorioSchema,
+  laboratorio: laboratorioCamposSchema,
+  janelas: z.strictObject({
+    manter: z.array(uuidSchema),
+    alterar: z.array(janelaAlteradaSchema),
+    novas: z.array(funcionamentoLaboratorioSchema).max(50),
+    remover: z.array(uuidSchema),
+  }),
+  equipamentos: z.array(equipamentoLaboratorioSchema).max(100),
+});
 export const bloqueioSchema = z
   .object({
     id: uuidSchema.optional(),

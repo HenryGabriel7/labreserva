@@ -53,6 +53,14 @@ export interface JanelaHorario {
   fim: string;
   duracao_slot_minutos: number;
 }
+export interface LaboratorioEdicao {
+  laboratorio: Laboratorio;
+  janelas: JanelaHorario[];
+  equipamentos: Equipamento[];
+  revisao: string;
+  total_janelas: number;
+  total_equipamentos: number;
+}
 export interface Reserva {
   id: string;
   laboratorio_id: string;
