@@ -16,16 +16,18 @@ const corpoSchema = z.object({}).strict();
 const pausa = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 Deno.serve(async (request: Request) => {
-  if (request.method !== "POST")
+  if (request.method !== "POST") {
     return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  }
   const segredo = Deno.env.get("NOTIFICATION_WORKER_SECRET") ?? "";
   if (
     !(await segredoWorkerValido(
       request.headers.get("x-worker-secret"),
       segredo,
     ))
-  )
+  ) {
     return new Response(null, { status: 401 });
+  }
   try {
     const valores = z
       .object({
@@ -46,14 +48,16 @@ Deno.serve(async (request: Request) => {
         segredoDescadastro: Deno.env.get("NOTIFICATION_UNSUBSCRIBE_SECRET"),
       });
     origemAplicacao(valores.appUrl);
-    if (Number(request.headers.get("content-length") ?? 0) > 1024)
+    if (Number(request.headers.get("content-length") ?? 0) > 1024) {
       return new Response(null, { status: 413 });
+    }
     const corpo = await request.text();
     if (
       corpo.length > 1024 ||
       !corpoSchema.safeParse(JSON.parse(corpo)).success
-    )
+    ) {
       return new Response(null, { status: 400 });
+    }
     const supabase = createClient(valores.supabaseUrl, valores.serviceRole, {
       auth: {
         persistSession: false,
@@ -125,25 +129,32 @@ Deno.serve(async (request: Request) => {
               .max(3)
               .parse(livres);
           }
-          let envelope = linha.mensagem_email;
-          if (!envelope) {
-            const mensagem = await prepararMensagem(
-              notificacao,
-              valores.appUrl,
-              identidade,
-              valores.segredoDescadastro,
-            );
-            const persistencia = await supabase.rpc(
-              "preparar_entrega_notificacao",
-              {
-                p_id: notificacao.id,
-                p_mensagem: { ...mensagem, remetente: valores.remetente },
-              },
-            );
-            if (persistencia.error) throw new Error("SNAPSHOT_INDISPONIVEL");
-            envelope = persistencia.data;
+          const novoEnvelope = linha.mensagem_email
+            ? null
+            : {
+                ...(await prepararMensagem(
+                  notificacao,
+                  valores.appUrl,
+                  identidade,
+                  valores.segredoDescadastro,
+                )),
+                remetente: valores.remetente,
+              };
+          // Uma anonimização pode invalidar o lease desde a retirada do lote.
+          const persistencia = await supabase.rpc(
+            "preparar_entrega_notificacao",
+            {
+              p_id: notificacao.id,
+              p_mensagem: novoEnvelope,
+            },
+          );
+          if (persistencia.error?.message === "NOTIFICACAO_NAO_RECLAMADA") {
+            continue;
           }
-          const { remetente, ...mensagem } = envelopeSchema.parse(envelope);
+          if (persistencia.error) throw new Error("SNAPSHOT_INDISPONIVEL");
+          const { remetente, ...mensagem } = envelopeSchema.parse(
+            persistencia.data,
+          );
           const entrega = await new ResendNotificationProvider(
             valores.resendKey,
             remetente,
@@ -153,13 +164,17 @@ Deno.serve(async (request: Request) => {
             p_id: notificacao.id,
             p_provedor_id: entrega.id,
           });
-          if (registro.error) throw new Error("REGISTRO_ENTREGA_INDISPONIVEL");
-          const conclusao = await supabase.rpc("concluir_notificacao", {
-            p_id: notificacao.id,
-            p_sucesso: true,
-            p_erro: null,
-          });
-          if (conclusao.error) throw new Error("CONCLUSAO_INDISPONIVEL");
+          if (registro.error?.message !== "NOTIFICACAO_NAO_RECLAMADA") {
+            if (registro.error) {
+              throw new Error("REGISTRO_ENTREGA_INDISPONIVEL");
+            }
+            const conclusao = await supabase.rpc("concluir_notificacao", {
+              p_id: notificacao.id,
+              p_sucesso: true,
+              p_erro: null,
+            });
+            if (conclusao.error) throw new Error("CONCLUSAO_INDISPONIVEL");
+          }
         } catch (error) {
           // Se o provedor já aceitou, preserve o lease: o reaper tentará novamente
           // com a MESMA chave Resend. Não rotule aceitação como falha de envio.
@@ -176,12 +191,14 @@ Deno.serve(async (request: Request) => {
               p_sucesso: false,
               p_erro: codigo,
             });
-            if (conclusao.error)
+            if (conclusao.error) {
               console.error("Falha ao registrar tentativa de e-mail.");
-          } else
+            }
+          } else {
             console.error(
               "Entrega aceita pelo provedor requer reconciliação da fila.",
             );
+          }
         }
         // Limita este worker a menos de duas chamadas por segundo (plano padrão).
         await pausa(550);
@@ -196,8 +213,9 @@ Deno.serve(async (request: Request) => {
     );
     return Response.json({ aceitas: lote?.length ?? 0 }, { status: 202 });
   } catch (error) {
-    if (error instanceof SyntaxError)
+    if (error instanceof SyntaxError) {
       return new Response(null, { status: 400 });
+    }
     console.error("Serviço de notificações indisponível.");
     return new Response(null, { status: 503 });
   }

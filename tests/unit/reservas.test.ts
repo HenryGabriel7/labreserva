@@ -5,11 +5,33 @@ import {
   intervaloValido,
   horariosSlots,
   diasCalendario,
+  intervalosNoDia,
+  moverPeriodoCalendario,
   validarHorarioReserva,
   campoErroReserva,
 } from "@/lib/reservas";
 import { reservaSchema, reservaFormularioSchema } from "@/lib/schemas-reservas";
 import { labsDemo, janelasDemo } from "@/lib/demo";
+
+it("navega por mês civil em fevereiro bissexto e na virada do ano", () => {
+  expect(moverPeriodoCalendario("2028-01-01", "mes", 1)).toBe("2028-02-01");
+  expect(moverPeriodoCalendario("2028-01-31", "mes", 1)).toBe("2028-02-01");
+  expect(diasCalendario("2028-02-01", "mes")).toContain("2028-02-29");
+  expect(moverPeriodoCalendario("2028-02-29", "mes", 1)).toBe("2028-03-01");
+  expect(moverPeriodoCalendario("2027-12-31", "mes", 1)).toBe("2028-01-01");
+  expect(moverPeriodoCalendario("2028-01-01", "mes", -1)).toBe("2027-12-01");
+});
+
+it("conta o bloqueio nos dias sobrepostos e exclui a meia-noite final de São Paulo", () => {
+  const bloqueio = {
+    inicio: "2028-01-30T02:30:00Z",
+    fim: "2028-02-02T03:00:00Z",
+  };
+  expect(intervalosNoDia([bloqueio], "2028-01-29")).toEqual([bloqueio]);
+  expect(intervalosNoDia([bloqueio], "2028-02-01")).toEqual([bloqueio]);
+  expect(intervalosNoDia([bloqueio], "2028-02-02")).toEqual([]);
+});
+
 it("papeis acumulados elevam prioridade só professor ou funcionário", () => {
   expect(prioridadeSolicitante(["aluno", "monitor", "admin"])).toBe(1);
   expect(prioridadeSolicitante(["funcionario", "monitor"])).toBe(2);

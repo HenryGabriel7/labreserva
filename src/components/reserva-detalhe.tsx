@@ -15,6 +15,7 @@ import { reservasDemo } from "@/lib/demo";
 import type { Reserva } from "@/lib/types";
 import { StatusBadge, LabIcon, dataBr } from "@/components/shared";
 import { CancelarReserva } from "@/components/reserva-acoes";
+import { ReservaDecisao } from "@/components/reserva-decisao";
 import "@/app/(portal)/reservas/reservas.css";
 
 export async function ReservaDetalhe({
@@ -45,17 +46,26 @@ export async function ReservaDetalhe({
   }
   if (!reserva) notFound();
   const r = reserva;
-  if (admin && !administrativo && r.solicitante_id !== ctx.usuario?.id)
-    redirect(`/admin/reservas/${id}`);
+  const propria = r.solicitante_id === ctx.usuario?.id;
+  if (admin && !administrativo && !propria) redirect(`/admin/reservas/${id}`);
+  // A RLS só permite ao monitor ler reservas de terceiros nos labs que gere.
+  const revisaoMonitor = !propria && ctx.usuario?.roles.includes("monitor");
+  const revisaoGestor = administrativo || revisaoMonitor;
   return (
     <>
       <Link
         className="section-link"
-        href={administrativo ? "/admin/solicitacoes" : "/reservas"}
+        href={
+          administrativo
+            ? "/admin/solicitacoes"
+            : revisaoMonitor
+              ? "/monitor"
+              : "/reservas"
+        }
         style={{ marginBottom: 22 }}
       >
         <ArrowLeft size={14} />
-        {administrativo ? "Solicitações" : "Minhas reservas"}
+        {revisaoGestor ? "Solicitações" : "Minhas reservas"}
       </Link>
       <div className="page-heading">
         <div>
@@ -64,7 +74,9 @@ export async function ReservaDetalhe({
             Protocolo #{id.slice(-8).toUpperCase()}
           </p>
         </div>
-        <StatusBadge status={r.status} />
+        <div role="status">
+          <StatusBadge status={r.status} />
+        </div>
       </div>
       <section className="panel reservation-detail">
         <div className="reservation-detail-title">
@@ -120,14 +132,22 @@ export async function ReservaDetalhe({
             <p>{r.motivo}</p>
           </>
         )}
-        {r.status === "pendente" && (
+        {r.status === "pendente" && revisaoGestor && (
+          <ReservaDecisao
+            key={r.id}
+            reservaId={r.id}
+            status={r.status}
+            demonstracao={ctx.demonstracao}
+            propria={propria}
+          />
+        )}
+        {r.status === "pendente" && !revisaoGestor && (
           <div
             className="notice"
             style={{ marginBlock: 22, display: "flex", gap: 9 }}
           >
             <ShieldCheck size={17} />
-            {administrativo ? "A solicitação" : "Sua solicitação"} está
-            aguardando análise.
+            Sua solicitação está aguardando análise.
           </div>
         )}
         {["pendente", "aprovada"].includes(r.status) && (

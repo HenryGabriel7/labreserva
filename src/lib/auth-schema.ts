@@ -32,12 +32,7 @@ export const definirSenhaSchema = z
   });
 const papeisSchema = z
   .array(z.enum(papeis))
-  .min(1, "Selecione um papel.")
-  .max(1, "Selecione somente um papel de acesso.")
-  .refine(
-    (valores) => new Set(valores).size === valores.length,
-    "Papéis repetidos.",
-  );
+  .length(1, "Selecione exatamente um papel de acesso.");
 export const conviteSchema = z
   .object({
     nome: z.string().trim().min(2).max(150),

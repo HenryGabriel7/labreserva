@@ -40,11 +40,14 @@ async function novaPagina(browser: Browser) {
   contextos.push(contexto);
   return contexto.newPage();
 }
-async function entrar(page: Page, email: string, senha = senhaDev) {
-  await page.goto("/login");
+async function preencherLogin(page: Page, email: string, senha = senhaDev) {
   await page.getByLabel("E-mail institucional").fill(email);
   await page.getByLabel("Senha", { exact: true }).fill(senha);
   await page.getByRole("button", { name: "Entrar na minha conta" }).click();
+}
+async function entrar(page: Page, email: string, senha = senhaDev) {
+  await page.goto("/login");
+  await preencherLogin(page, email, senha);
   await expect(page).toHaveURL(`${liveURL}/`);
 }
 async function preencherSolicitacao(
@@ -163,8 +166,46 @@ test.describe("fluxos reais Supabase local", () => {
   test("área administrativa sem sessão redireciona para login", async ({
     page,
   }) => {
-    await page.goto("/admin/usuarios");
-    await expect(page).toHaveURL(`${liveURL}/login`);
+    await page.goto("/admin/usuarios?pagina=2");
+    const url = new URL(page.url());
+    expect(url.pathname).toBe("/login");
+    expect(url.searchParams.get("destino")).toBe("/admin/usuarios?pagina=2");
+    await preencherLogin(page, pessoas.aluno.email);
+    await expect(page).toHaveURL(`${liveURL}/acesso-negado`);
+  });
+
+  test("a página pública de privacidade retoma o destino após o login", async ({
+    page,
+  }) => {
+    await page.goto("/privacidade");
+    await page
+      .getByRole("link", { name: "Acessar meus dados pessoais" })
+      .click();
+    await expect(page).toHaveURL(/\/login\?destino=/);
+    expect(new URL(page.url()).searchParams.get("destino")).toBe(
+      "/relatorios/privacidade",
+    );
+    await preencherLogin(page, pessoas.aluno.email);
+    await expect(page).toHaveURL(`${liveURL}/relatorios/privacidade`);
+    await expect(
+      page.getByRole("heading", { name: "Transparência sobre seus dados" }),
+    ).toBeVisible();
+    await expect(page.getByLabel("ID do usuário para exportação")).toHaveCount(
+      0,
+    );
+    const outraConta = await page.request.post("/api/privacidade", {
+      headers: { Origin: liveURL },
+      data: { acao: "exportar", usuario_id: pessoas.professor.id },
+    });
+    expect(outraConta.status()).toBe(403);
+  });
+
+  test("login com destino externo volta ao início", async ({ page }) => {
+    await page.goto(
+      `/login?destino=${encodeURIComponent("https://fora.invalid/")}`,
+    );
+    await preencherLogin(page, pessoas.aluno.email);
+    await expect(page).toHaveURL(`${liveURL}/`);
   });
 
   for (const papel of [
@@ -247,24 +288,55 @@ test.describe("fluxos reais Supabase local", () => {
     ).toBeDisabled();
   });
 
-  test("admin abre o detalhe administrativo e recusa a solicitação de outra conta", async ({
+  test("admin aprova e recusa solicitações de outra conta pelo detalhe administrativo", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
     const lab = await criarLaboratorio(clienteServico(), pessoas.monitor.id);
-    const finalidade = `QA recusa administrativa ${randomUUID().slice(0, 8)}`;
-    const id = await solicitar(pessoas.aluno.cliente, lab.id, finalidade);
     await entrar(page, pessoas.admin.email);
-    await page.goto(`/monitor?lab=${lab.id}`);
-    await expect(page).toHaveURL(`${liveURL}/admin/solicitacoes?lab=${lab.id}`);
-    const pedido = card(page, finalidade);
-    await pedido.getByRole("link", { name: finalidade, exact: true }).click();
-    await expect(page).toHaveURL(`${liveURL}/admin/reservas/${id}`);
-    await page.goBack();
-    await pedido
-      .getByLabel("Motivo da decisão")
-      .fill("Recusa na área administrativa de teste.");
-    await pedido.getByRole("button", { name: "Recusar", exact: true }).click();
-    await expect.poll(() => status(id)).toBe("recusada");
+    const decisoes = [
+      { acao: "Aprovar", estado: "aprovada", rotulo: "Aprovada", dias: 2 },
+      { acao: "Recusar", estado: "recusada", rotulo: "Recusada", dias: 3 },
+    ];
+    for (const { acao, estado, rotulo, dias } of decisoes) {
+      const finalidade = `QA ${acao} no detalhe ${randomUUID().slice(0, 8)}`;
+      const id = await solicitar(
+        pessoas.aluno.cliente,
+        lab.id,
+        finalidade,
+        horarioFuturo(dias),
+      );
+      await page.goto(`/monitor?lab=${lab.id}`);
+      await expect(page).toHaveURL(
+        `${liveURL}/admin/solicitacoes?lab=${lab.id}`,
+      );
+      await card(page, finalidade)
+        .getByRole("link", { name: finalidade, exact: true })
+        .click();
+      await expect(page).toHaveURL(`${liveURL}/admin/reservas/${id}`);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(360);
+
+      const decidir = page.getByRole("button", { name: acao, exact: true });
+      const campoMotivo = page.getByLabel("Motivo da decisão");
+      await decidir.click();
+      const erro = page.getByText("Informe o motivo desta decisão.", {
+        exact: true,
+      });
+      await expect(erro).toBeVisible();
+      await expect(erro).toHaveAttribute("role", "alert");
+      await expect(campoMotivo).toBeFocused();
+      await expect(campoMotivo).toHaveAttribute("aria-invalid", "true");
+      expect(await status(id)).toBe("pendente");
+
+      const motivo = `Decisão administrativa no detalhe: ${acao}.`;
+      await campoMotivo.fill(motivo);
+      await decidir.click();
+      await expect.poll(() => status(id)).toBe(estado);
+      await expect(page.getByText(rotulo, { exact: true })).toBeVisible();
+      await expect(page.getByText(motivo, { exact: true })).toBeVisible();
+    }
   });
 
   test("editor bloqueia carga com falha ou resposta parcial e permite tentar novamente", async ({
@@ -534,6 +606,54 @@ test.describe("fluxos reais Supabase local", () => {
     ).toBeVisible();
   });
 
+  test("agenda mostra atividade de hoje após 21 reservas futuras e respeita o usuário", async ({
+    page,
+  }) => {
+    const servico = clienteServico();
+    const lab = await criarLaboratorio(servico, pessoas.monitor.id);
+    const outroLab = await criarLaboratorio(servico);
+    const finalidade = `QA agenda hoje ${randomUUID()}`;
+    const outraFinalidade = `QA agenda privada ${randomUUID()}`;
+    const base = {
+      laboratorio_id: lab.id,
+      solicitante_id: pessoas.aluno.id,
+      escopo: "laboratorio",
+      n_participantes: 3,
+      prioridade_efetiva: 1,
+      papel_solicitante: "aluno",
+      status: "aprovada",
+    };
+    const hoje = horarioFuturo(0);
+    exigirSucesso(
+      await servico
+        .from("reservas")
+        .insert([
+          ...Array.from({ length: 21 }, (_, i) => {
+            const { inicio, fim } = horarioFuturo(i + 1);
+            return { ...base, inicio, fim, finalidade: `QA futuro ${i}` };
+          }),
+          { ...base, inicio: hoje.inicio, fim: hoje.fim, finalidade },
+          {
+            ...base,
+            inicio: hoje.inicio,
+            fim: hoje.fim,
+            finalidade: outraFinalidade,
+            laboratorio_id: outroLab.id,
+            solicitante_id: pessoas.professor.id,
+          },
+        ])
+        .select("id"),
+      "Criar reservas fictícias para a agenda",
+    );
+    await entrar(page, pessoas.aluno.email);
+    const agenda = page.locator("section").filter({
+      has: page.getByRole("heading", { name: "Na agenda de hoje" }),
+    });
+    await expect(agenda.getByText(finalidade)).toBeVisible();
+    await expect(agenda.getByText(outraFinalidade)).toHaveCount(0);
+    await expect(agenda.getByText("Agenda livre")).toHaveCount(0);
+  });
+
   test("login → solicitar → monitor aprova → check-in → check-out", async ({
     page,
     browser,
@@ -550,7 +670,17 @@ test.describe("fluxos reais Supabase local", () => {
     );
     const monitor = await novaPagina(browser);
     await entrar(monitor, pessoas.monitor.email);
-    await aprovarNaTela(monitor, lab.id, finalidade, id);
+    await monitor.goto(`/monitor?lab=${lab.id}`);
+    await card(monitor, finalidade)
+      .getByRole("link", { name: finalidade })
+      .click();
+    await expect(monitor).toHaveURL(new RegExp(`/reservas/${id}$`));
+    await monitor.getByLabel("Motivo da decisão").fill("Horário disponível.");
+    await monitor.getByRole("button", { name: "Aprovar", exact: true }).click();
+    await expect(
+      monitor.getByRole("status").getByText("Aprovada"),
+    ).toBeVisible();
+    await expect.poll(() => status(id)).toBe("aprovada");
     await colocarReservaNoHorario(id);
     await monitor.goto(`/monitor?aba=agenda&lab=${lab.id}`);
     await card(monitor, finalidade)

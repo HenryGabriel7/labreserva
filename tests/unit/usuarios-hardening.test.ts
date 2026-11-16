@@ -130,6 +130,34 @@ describe("hardening de convites administrativos", () => {
     expect((await POST(criarRequest({ csv }))).status).toBe(400);
     expect(contexto.generateLink).not.toHaveBeenCalled();
   });
+  it.each(["aluno", "professor", "funcionario", "monitor", "admin"])(
+    "provisiona um único papel válido por JSON e CSV: %s",
+    async (papel) => {
+      const csv = `nome,email,matricula,papeis\nPessoa Exemplo,pessoa@teste.edu.br,2026001,${papel}`;
+      expect(
+        (await POST(criarRequest({ ...convite, papeis: [papel] }))).status,
+      ).toBe(201);
+      expect((await POST(criarRequest({ csv }))).status).toBe(201);
+      const provisionamentos = contexto.adminRpc.mock.calls.filter(
+        ([nome]) => nome === "provisionar_usuario",
+      );
+      expect(provisionamentos.map(([, dados]) => dados.p_papeis)).toEqual([
+        [papel],
+        [papel],
+      ]);
+    },
+  );
+  it("rejeita a ausência e a multiplicidade de papéis antes de chamar o Auth", async () => {
+    for (const papeis of [[], ["aluno", "monitor"], ["admin", "admin"]]) {
+      expect((await POST(criarRequest({ ...convite, papeis }))).status).toBe(
+        400,
+      );
+    }
+    const csv =
+      "nome,email,matricula,papeis\nPessoa Boa,boa@teste.edu.br,1,aluno\nPessoa Ruim,ruim@teste.edu.br,2,aluno|monitor";
+    expect((await POST(criarRequest({ csv }))).status).toBe(400);
+    expect(contexto.generateLink).not.toHaveBeenCalled();
+  });
   it("gera somente invite e passa o bearer para a fila sem retorná-lo", async () => {
     const response = await POST(criarRequest(convite));
     expect(response.status).toBe(201);

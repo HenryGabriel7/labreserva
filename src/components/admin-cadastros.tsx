@@ -41,6 +41,7 @@ export function AdminCadastros({
     id: null,
   });
   const selecaoAtual = useRef(selecao);
+  const editor = useRef<HTMLElement>(null);
   const { tab, id: editando } = selecao;
   const [mensagem, setMensagem] = useState("");
   const [pendente, startTransition] = useTransition();
@@ -269,6 +270,8 @@ export function AdminCadastros({
                     onClick={() => {
                       selecionar(tab, item.id);
                       setMensagem("");
+                      editor.current?.focus({ preventScroll: true });
+                      editor.current?.scrollIntoView({ block: "start" });
                     }}
                     aria-label="Editar cadastro"
                   >
@@ -288,33 +291,40 @@ export function AdminCadastros({
             ))}
           </div>
         </section>
-        {tab === "laboratorios" ? (
-          <EditorLaboratorio
-            key={`laboratorio-${editando}`}
-            id={editando}
-            dadosDemo={
-              laboratorioDemo
-                ? montarDadosDemo(laboratorioDemo, janelas, equipamentos)
-                : undefined
-            }
-            demonstracao={demonstracao}
-            onSaved={(id, mensagem) => {
-              if (selecaoAtual.current !== selecao) return false;
-              selecionar("laboratorios", id);
-              setMensagem(mensagem);
-              return true;
-            }}
-          />
-        ) : (
-          <CadastroForm
-            key={`${tab}-${editando}`}
-            campos={campos}
-            iniciais={iniciais}
-            id={editando}
-            tab={tab}
-            demonstracao={demonstracao}
-          />
-        )}
+        <section
+          ref={editor}
+          tabIndex={-1}
+          aria-label="Editor de cadastro"
+          className="crud-editor"
+        >
+          {tab === "laboratorios" ? (
+            <EditorLaboratorio
+              key={`laboratorio-${editando}`}
+              id={editando}
+              dadosDemo={
+                laboratorioDemo
+                  ? montarDadosDemo(laboratorioDemo, janelas, equipamentos)
+                  : undefined
+              }
+              demonstracao={demonstracao}
+              onSaved={(id, mensagem) => {
+                if (selecaoAtual.current !== selecao) return false;
+                selecionar("laboratorios", id);
+                setMensagem(mensagem);
+                return true;
+              }}
+            />
+          ) : (
+            <CadastroForm
+              key={`${tab}-${editando}`}
+              campos={campos}
+              iniciais={iniciais}
+              id={editando}
+              tab={tab}
+              demonstracao={demonstracao}
+            />
+          )}
+        </section>
       </div>
     </>
   );

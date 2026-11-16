@@ -94,7 +94,7 @@ export default defineConfig({
     },
     {
       name: "supabase-local",
-      testMatch: "supabase.spec.ts",
+      testMatch: ["supabase.spec.ts", "calendario-catalogo.spec.ts"],
       use: {
         ...devices["Desktop Chrome"],
         baseURL: liveURL,

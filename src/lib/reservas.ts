@@ -273,3 +273,30 @@ export function diasCalendario(
     somarDias(inicio, i),
   );
 }
+
+export function moverPeriodoCalendario(
+  data: string,
+  visao: "dia" | "semana" | "mes",
+  direcao: -1 | 1,
+): string {
+  if (visao !== "mes")
+    return somarDias(data, direcao * (visao === "dia" ? 1 : 7));
+  const primeiroDia = new Date(`${data.slice(0, 7)}-01T12:00:00Z`);
+  primeiroDia.setUTCMonth(primeiroDia.getUTCMonth() + direcao);
+  return primeiroDia.toISOString().slice(0, 10);
+}
+
+export function inicioDiaCalendario(data: string): Date {
+  return fromZonedTime(`${data}T00:00:00`, "America/Sao_Paulo");
+}
+
+export function intervalosNoDia<T extends { inicio: string; fim: string }>(
+  intervalos: T[],
+  data: string,
+): T[] {
+  const inicio = inicioDiaCalendario(data).getTime();
+  const fim = inicioDiaCalendario(somarDias(data, 1)).getTime();
+  return intervalos.filter(
+    (item) => Date.parse(item.inicio) < fim && Date.parse(item.fim) > inicio,
+  );
+}

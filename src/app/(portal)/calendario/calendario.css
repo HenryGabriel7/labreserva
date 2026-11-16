@@ -186,7 +186,7 @@
 }
 .month-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 .month-weekday {
   background: #f8fafb;
@@ -215,6 +215,11 @@
   margin-top: 13px;
   padding: 5px;
   border-radius: 3px;
+  overflow-wrap: anywhere;
+}
+.month-day .month-blocked {
+  background: #f3eeee;
+  color: #785757;
 }
 .other-month {
   color: #626b6e;
@@ -282,6 +287,9 @@
   .month-day {
     padding: 8px;
     min-height: 75px;
+  }
+  .month-weekday {
+    padding-inline: 2px;
   }
   .month-day small {
     font-size: 7px;

@@ -162,10 +162,34 @@ describe.skipIf(!ambienteLocal)(
       const servico = clienteServico();
       const admin = await criarPessoa("admin", servico);
       const email = `invite-${randomUUID()}@teste.edu.br`;
-      const link = exigirSucesso(
+      const original = exigirSucesso(
         await servico.auth.admin.generateLink({ type: "invite", email }),
         "Gerar convite sem SMTP",
       );
+      const tentativa = await servico.rpc("provisionar_usuario", {
+        p_usuario_id: original.user.id,
+        p_nome: "Convite de integração",
+        p_email: email,
+        p_matricula: null,
+        p_papeis: ["aluno"],
+        p_ator_id: admin.id,
+        p_token_hash: original.properties.hashed_token,
+        p_app_url: "origem inválida",
+      });
+      expect(tentativa.error?.message).toBe("ENTRADA_INVALIDA");
+      for (const tabela of ["profiles", "notificacoes"]) {
+        const { data, error } = await servico
+          .from(tabela)
+          .select("id")
+          .eq(tabela === "profiles" ? "id" : "usuario_id", original.user.id);
+        expect(error).toBeNull();
+        expect(data).toEqual([]);
+      }
+      const link = exigirSucesso(
+        await servico.auth.admin.generateLink({ type: "invite", email }),
+        "Reemitir o convite após falha do provisionamento",
+      );
+      expect(link.user.id).toBe(original.user.id);
       expect(link.properties.hashed_token).toBeTruthy();
       exigirSucesso(
         await servico.rpc("provisionar_usuario", {

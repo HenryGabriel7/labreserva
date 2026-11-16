@@ -52,7 +52,7 @@ function Enviar({
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ destino }: { destino: string }) {
   const [estado, acao, pendenteAcao] = useActionState(loginAction, {});
   const [pendente, transicao] = useTransition();
   const {
@@ -69,7 +69,7 @@ export function LoginForm() {
         className="auth-form"
         noValidate
         onSubmit={handleSubmit((valores) =>
-          transicao(() => acao(formData(valores))),
+          transicao(() => acao(formData({ ...valores, destino }))),
         )}
         aria-busy={pendente || pendenteAcao}
       >

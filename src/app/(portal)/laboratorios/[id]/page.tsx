@@ -9,7 +9,7 @@ import {
   Clock3,
   ShieldCheck,
 } from "lucide-react";
-import { getLaboratorios, getEquipamentos, getJanelas } from "@/lib/data";
+import { getLaboratorioAtivo, getEquipamentos, getJanelas } from "@/lib/data";
 import { LabIcon } from "@/components/shared";
 import "../laboratorios.css";
 const dias = [
@@ -28,13 +28,12 @@ export default async function LaboratorioDetail({
 }) {
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
-  const [labs, equips, janelas] = await Promise.all([
-    getLaboratorios("ativos"),
-    getEquipamentos(),
-    getJanelas(),
-  ]);
-  const lab = labs.find((l) => l.id === id);
+  const lab = await getLaboratorioAtivo(id);
   if (!lab) notFound();
+  const [equips, janelas] = await Promise.all([
+    getEquipamentos(id),
+    getJanelas(id),
+  ]);
   return (
     <>
       <Link
@@ -97,25 +96,23 @@ export default async function LaboratorioDetail({
                   </tr>
                 </thead>
                 <tbody>
-                  {equips
-                    .filter((e) => e.laboratorio_id === id)
-                    .map((e) => (
-                      <tr key={e.id}>
-                        <td>{e.nome}</td>
-                        <td>{e.quantidade}</td>
-                        <td>
-                          <span
-                            className={`badge badge-${e.status === "ativo" ? "green" : "amber"}`}
-                          >
-                            {e.status === "ativo"
-                              ? "Disponível"
-                              : e.status === "manutencao"
-                                ? "Manutenção"
-                                : "Inativo"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                  {equips.map((e) => (
+                    <tr key={e.id}>
+                      <td>{e.nome}</td>
+                      <td>{e.quantidade}</td>
+                      <td>
+                        <span
+                          className={`badge badge-${e.status === "ativo" ? "green" : "amber"}`}
+                        >
+                          {e.status === "ativo"
+                            ? "Disponível"
+                            : e.status === "manutencao"
+                              ? "Manutenção"
+                              : "Inativo"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -131,26 +128,24 @@ export default async function LaboratorioDetail({
         <aside>
           <section className="panel detail-card">
             <h2>Horário de funcionamento</h2>
-            {janelas
-              .filter((j) => j.laboratorio_id === id)
-              .map((j) => (
-                <div
-                  key={j.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "12px 0",
-                    borderBottom: "1px solid #edf1f3",
-                    fontSize: 10,
-                    color: "#526a76",
-                  }}
-                >
-                  <span>{dias[j.dia_semana]}</span>
-                  <span>
-                    {j.inicio.slice(0, 5)} – {j.fim.slice(0, 5)}
-                  </span>
-                </div>
-              ))}
+            {janelas.map((j) => (
+              <div
+                key={j.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "12px 0",
+                  borderBottom: "1px solid #edf1f3",
+                  fontSize: 10,
+                  color: "#526a76",
+                }}
+              >
+                <span>{dias[j.dia_semana]}</span>
+                <span>
+                  {j.inicio.slice(0, 5)} – {j.fim.slice(0, 5)}
+                </span>
+              </div>
+            ))}
             <p style={{ fontSize: 10, marginTop: 20 }}>
               Duração de {lab.duracao_minima_minutos} a{" "}
               {lab.duracao_maxima_minutos} minutos. Intervalos de{" "}

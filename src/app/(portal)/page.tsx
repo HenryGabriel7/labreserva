@@ -12,7 +12,12 @@ import {
   CircleHelp,
   ClipboardCheck,
 } from "lucide-react";
-import { getContexto, getLaboratorios, getReservas } from "@/lib/data";
+import {
+  getAgendaPainel,
+  getContexto,
+  getLaboratorios,
+  getReservas,
+} from "@/lib/data";
 import {
   PageHeading,
   LabIcon,
@@ -28,12 +33,14 @@ export default async function Dashboard() {
   const { usuario } = await getContexto();
   const admin = usuario?.roles.includes("admin") ?? false;
   const gestor = !admin && usuario?.roles.includes("monitor");
-  const [labs, { reservas }, resumo] = await Promise.all([
+  const agora = new Date();
+  const [labs, { reservas }, resumo, { reservas: agenda }] = await Promise.all([
     getLaboratorios("ativos"),
     getReservas({ minhas: !gestor }),
     getResumoPainel({ pessoal: admin }),
+    getAgendaPainel(!gestor, agora),
   ]);
-  const hoje = dataBr(new Date().toISOString(), "yyyy-MM-dd");
+  const hoje = dataBr(agora.toISOString(), "yyyy-MM-dd");
   const reservasHoje = reservas.filter(
     (r) => dataBr(r.inicio, "yyyy-MM-dd") === hoje,
   );
@@ -55,8 +62,7 @@ export default async function Dashboard() {
             100,
         )
       : 0);
-  const proximas = reservasHoje
-    .filter((r) => ["aprovada", "em_uso"].includes(r.status))
+  const proximas = agenda
     .sort((a, b) => a.inicio.localeCompare(b.inicio))
     .slice(0, 3);
   const metrics = [
@@ -97,7 +103,7 @@ export default async function Dashboard() {
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(new Date());
+  }).format(agora);
   return (
     <>
       <PageHeading
@@ -176,7 +182,7 @@ export default async function Dashboard() {
             </div>
             <div className="lab-overview-grid">
               {labs.slice(0, 4).map((lab) => {
-                const emUso = reservasHoje.some(
+                const emUso = agenda.some(
                   (r) => r.laboratorio_id === lab.id && r.status === "em_uso",
                 );
                 return (
@@ -325,7 +331,7 @@ export default async function Dashboard() {
                 <h2>Na agenda de hoje</h2>
               </div>
               <span className="today-date">
-                {dataBr(new Date().toISOString(), "dd/MM")}
+                {dataBr(agora.toISOString(), "dd/MM")}
               </span>
             </div>
             <div className="today-agenda">

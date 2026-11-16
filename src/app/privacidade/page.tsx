@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { FlaskConical, ArrowLeft, ShieldCheck } from "lucide-react";
+import { lerPrivacidadePublica } from "@/lib/privacidade-publica";
+
 export const metadata = { title: "Privacidade" };
 export default function Privacidade() {
+  const { contato, retencao } = lerPrivacidadePublica(
+    process.env.PRIVACIDADE_CONTATO_EMAIL,
+    process.env.PRIVACIDADE_RETENCAO,
+  );
   return (
     <main
       id="conteudo"
@@ -60,16 +66,31 @@ export default function Privacidade() {
             Acessar meus dados pessoais
           </Link>
           <h2 style={{ fontSize: 17, color: "#253f4d", marginTop: 30 }}>
-            Conservação e contato
+            Conservação dos dados
           </h2>
           <p>
-            A instituição responsável deve informar seu encarregado e confirmar
-            os prazos de conservação antes da implantação. A configuração de
-            referência prevê 24 meses para reservas e ocorrências e 60 meses
-            para auditoria, sujeitos à política institucional. Procure a
-            administração acadêmica para exercer seus direitos ou esclarecer
-            dúvidas.
+            {retencao ??
+              "Os prazos de conservação aguardam confirmação pela instituição."}
           </p>
+          <h2 style={{ fontSize: 17, color: "#253f4d" }}>
+            Contato de privacidade
+          </h2>
+          {contato ? (
+            <p>
+              Para exercer seus direitos, solicitar correção ou esclarecer
+              dúvidas, escreva para{" "}
+              <a className="section-link" href={contato.href}>
+                {contato.email}
+              </a>
+              .
+            </p>
+          ) : (
+            <p>
+              A instituição ainda precisa cadastrar o canal de atendimento neste
+              portal. Procure a administração acadêmica pelos canais oficiais da
+              sua instituição.
+            </p>
+          )}
         </div>
       </section>
       <Link className="section-link" href="/" style={{ marginTop: 25 }}>

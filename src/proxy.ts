@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { criarCsp } from "@/lib/security";
+import { destinoPosLogin } from "@/lib/destino-login";
 
 const rotasPublicas = [
   "/login",
@@ -69,6 +70,10 @@ export async function proxy(request: NextRequest) {
     const destino = request.nextUrl.clone();
     destino.pathname = "/login";
     destino.search = "";
+    if (request.method === "GET" || request.method === "HEAD") {
+      const retorno = destinoPosLogin(`${caminho}${request.nextUrl.search}`);
+      if (retorno !== "/") destino.searchParams.set("destino", retorno);
+    }
     const redirect = NextResponse.redirect(destino);
     redirect.headers.set("Content-Security-Policy", csp);
     for (const cookie of response.cookies.getAll())

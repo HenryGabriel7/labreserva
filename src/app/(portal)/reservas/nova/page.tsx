@@ -30,16 +30,31 @@ export default async function NovaReserva({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [params, laboratorios, equipamentos, janelas, ctx] = await Promise.all([
-    searchParams,
-    getLaboratorios("ativos"),
-    getEquipamentos(),
-    getJanelas(),
-    getContexto(),
-  ]);
+  const params = await searchParams;
   const parsed = schema.safeParse(params);
   const parametros = parsed.success ? parsed.data : {};
+  const [laboratorios, equipamentosGerais, janelasGerais, ctx] =
+    await Promise.all([
+      getLaboratorios("ativos", parametros.lab),
+      getEquipamentos(),
+      getJanelas(),
+      getContexto(),
+    ]);
   const labInicial = laboratorios.find((lab) => lab.id === parametros.lab)?.id;
+  let equipamentos = equipamentosGerais;
+  let janelas = janelasGerais;
+  if (labInicial) {
+    const [itensDoLab, janelasDoLab] = await Promise.all([
+      getEquipamentos(labInicial),
+      getJanelas(labInicial),
+    ]);
+    equipamentos = equipamentosGerais
+      .filter((item) => item.laboratorio_id !== labInicial)
+      .concat(itensDoLab);
+    janelas = janelasGerais
+      .filter((janela) => janela.laboratorio_id !== labInicial)
+      .concat(janelasDoLab);
+  }
   const labIndisponivel = Boolean(parametros.lab && !labInicial);
   const politica = { antecedenciaMinHoras: 1, antecedenciaMaxDias: 90 };
   if (!ctx.demonstracao) {

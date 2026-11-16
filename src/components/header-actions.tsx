@@ -62,6 +62,9 @@ export function HeaderActions({
   const lista = useRef<HTMLUListElement>(null);
   const perfil = useRef<HTMLButtonElement>(null);
   const id = useId();
+  const papelVisivel = demonstracao
+    ? "Demonstração"
+    : (rotulosPapel[roles[0]] ?? "Comunidade acadêmica");
   const novas = notificacoes.filter(
     (item) => !item.lidaEm && !lidas.includes(item.id),
   );
@@ -78,6 +81,7 @@ export function HeaderActions({
     .slice(0, 2)
     .map((parte) => parte[0])
     .join("");
+  const avatarVisivel = demonstracao ? "LR" : iniciais;
 
   useEffect(() => {
     if (!aberto) return;
@@ -150,22 +154,17 @@ export function HeaderActions({
         ref={perfil}
         type="button"
         className="profile-menu"
-        aria-label={`Menu de perfil de ${nome}`}
+        aria-label={`${avatarVisivel} ${nome} ${papelVisivel}, menu de perfil`}
         aria-haspopup="menu"
         aria-expanded={aberto === "perfil"}
         aria-controls={`${id}-perfil`}
         onClick={() => setAberto(aberto === "perfil" ? null : "perfil")}
       >
         <span className="avatar" aria-hidden="true">
-          {demonstracao ? "LR" : iniciais}
-        </span>
+          {avatarVisivel}
+        </span>{" "}
         <span className="profile-menu-copy">
-          <strong>{nome}</strong>
-          <small>
-            {demonstracao
-              ? "Demonstração"
-              : (rotulosPapel[roles[0]] ?? "Comunidade acadêmica")}
-          </small>
+          <strong>{nome}</strong> <small>{papelVisivel}</small>
         </span>
         <ChevronDown size={14} aria-hidden="true" />
       </button>

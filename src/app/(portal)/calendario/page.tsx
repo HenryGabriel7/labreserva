@@ -1,11 +1,11 @@
 import { z } from "@/lib/validacao";
-import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { formatInTimeZone } from "date-fns-tz";
 import { getContexto, getLaboratorios } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { reservasDemo } from "@/lib/demo";
 import { PageHeading, EmptyState } from "@/components/shared";
 import { Calendario, type Ocupado } from "@/components/calendario";
-import { diasCalendario, somarDias } from "@/lib/reservas";
+import { diasCalendario, inicioDiaCalendario, somarDias } from "@/lib/reservas";
 import "./calendario.css";
 const schema = z
   .object({
@@ -19,13 +19,13 @@ export default async function CalendarioPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [params, labs, ctx] = await Promise.all([
-    searchParams,
-    getLaboratorios("ativos"),
-    getContexto(),
-  ]);
+  const params = await searchParams;
   const parsed = schema.safeParse(params);
   const f = parsed.success ? parsed.data : {};
+  const [labs, ctx] = await Promise.all([
+    getLaboratorios("ativos", f.lab),
+    getContexto(),
+  ]);
   const lab = labs.find((l) => l.id === f.lab)?.id ?? labs[0]?.id;
   const data =
     f.data ?? formatInTimeZone(new Date(), "America/Sao_Paulo", "yyyy-MM-dd");
@@ -52,14 +52,8 @@ export default async function CalendarioPage({
       "consultar_disponibilidade",
       {
         p_laboratorio_id: lab,
-        p_inicio: fromZonedTime(
-          `${dias[0]}T00:00:00`,
-          "America/Sao_Paulo",
-        ).toISOString(),
-        p_fim: fromZonedTime(
-          `${somarDias(dias.at(-1)!, 1)}T00:00:00`,
-          "America/Sao_Paulo",
-        ).toISOString(),
+        p_inicio: inicioDiaCalendario(dias[0]).toISOString(),
+        p_fim: inicioDiaCalendario(somarDias(dias.at(-1)!, 1)).toISOString(),
       },
     );
     if (error) throw new Error("Falha ao consultar disponibilidade");

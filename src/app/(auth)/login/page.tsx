@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { z } from "@/lib/validacao";
 import { getCurrentUser } from "@/lib/auth";
+import { destinoPosLogin } from "@/lib/destino-login";
 import { LoginForm } from "../auth-forms";
 
 export const metadata: Metadata = { title: "Entrar" };
@@ -10,6 +11,7 @@ const parametrosSchema = z
   .object({
     senha: z.literal("atualizada").optional(),
     erro: z.literal("link-invalido").optional(),
+    destino: z.unknown().optional(),
   })
   .strict();
 
@@ -18,8 +20,10 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (await getCurrentUser()) redirect("/");
-  const parametros = parametrosSchema.safeParse(await searchParams);
+  const busca = await searchParams;
+  const destino = destinoPosLogin(busca.destino);
+  if (await getCurrentUser()) redirect(destino);
+  const parametros = parametrosSchema.safeParse(busca);
   return (
     <>
       <span className="auth-kicker">
@@ -49,7 +53,7 @@ export default async function LoginPage({
           Este link é inválido ou expirou. Solicite novas instruções de acesso.
         </p>
       )}
-      <LoginForm />
+      <LoginForm destino={destino} />
     </>
   );
 }

@@ -2,7 +2,11 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, CalendarDays, Plus } from "lucide-react";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
-import { diasCalendario, somarDias } from "@/lib/reservas";
+import {
+  diasCalendario,
+  intervalosNoDia,
+  moverPeriodoCalendario,
+} from "@/lib/reservas";
 import type { Laboratorio } from "@/lib/types";
 export type Ocupado = {
   inicio: string;
@@ -27,7 +31,6 @@ export function Calendario({
   const dias = diasCalendario(data, visao);
   const url = (d = data, v = visao) =>
     `/calendario?lab=${lab}&data=${d}&visao=${v}`;
-  const delta = visao === "dia" ? 1 : visao === "semana" ? 7 : 28;
   const horaLocal = (d: string, h: number) =>
     fromZonedTime(
       `${d}T${String(h).padStart(2, "0")}:00:00`,
@@ -96,7 +99,7 @@ export function Calendario({
         <div className="page-actions">
           <Link
             className="button button-ghost button-icon"
-            href={url(somarDias(data, -delta))}
+            href={url(moverPeriodoCalendario(data, visao, -1))}
             aria-label="Período anterior"
           >
             <ChevronLeft size={17} />
@@ -111,7 +114,7 @@ export function Calendario({
           </h2>
           <Link
             className="button button-ghost button-icon"
-            href={url(somarDias(data, delta))}
+            href={url(moverPeriodoCalendario(data, visao, 1))}
             aria-label="Próximo período"
           >
             <ChevronRight size={17} />
@@ -135,25 +138,34 @@ export function Calendario({
             </div>
           ))}
           {dias.map((d) => {
-            const n = ocupados.filter(
-              (o) =>
-                formatInTimeZone(
-                  new Date(o.inicio),
-                  "America/Sao_Paulo",
-                  "yyyy-MM-dd",
-                ) === d,
-            ).length;
+            const intervalos = intervalosNoDia(ocupados, d);
+            const bloqueios = intervalos.filter((o) => o.bloqueado).length;
+            const reservas = intervalos.length - bloqueios;
             return (
               <Link
                 key={d}
                 href={url(d, "dia")}
+                aria-label={[
+                  d.split("-").reverse().join("/"),
+                  bloqueios > 0 &&
+                    `${bloqueios} bloqueio${bloqueios === 1 ? "" : "s"}`,
+                  reservas > 0 &&
+                    `${reservas} intervalo${reservas === 1 ? "" : "s"} com reserva`,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
                 className={`month-day ${d.slice(0, 7) !== data.slice(0, 7) ? "other-month" : ""}`}
               >
                 <span>{Number(d.slice(-2))}</span>
-                {n > 0 && (
+                {bloqueios > 0 && (
+                  <small className="month-blocked">
+                    {bloqueios} bloqueio{bloqueios === 1 ? "" : "s"}
+                  </small>
+                )}
+                {reservas > 0 && (
                   <small>
-                    {n} intervalo{n !== 1 ? "s" : ""}
-                    <span> ocupado{n !== 1 ? "s" : ""}</span>
+                    {reservas} intervalo{reservas === 1 ? "" : "s"}
+                    <span> ocupado{reservas === 1 ? "" : "s"}</span>
                   </small>
                 )}
               </Link>

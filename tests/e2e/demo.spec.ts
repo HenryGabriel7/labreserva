@@ -37,7 +37,7 @@ test("cabeçalho abre notificações e opções da conta sem trocar de página",
   expect(
     (
       await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
         .analyze()
     ).violations,
   ).toEqual([]);
@@ -58,7 +58,13 @@ test("cabeçalho abre notificações e opções da conta sem trocar de página",
   await expect(sino).toBeFocused();
   await expect(sino).toHaveAttribute("aria-expanded", "false");
 
-  const perfil = cabecalho.getByRole("button", { name: /Menu de perfil/ });
+  const perfil = cabecalho.getByRole("button", { name: /menu de perfil/i });
+  const avatarVisivel = await perfil.locator(".avatar").innerText();
+  const nomeVisivel = await perfil.locator("strong").innerText();
+  const papelVisivel = await perfil.locator("small").innerText();
+  await expect(perfil).toHaveAccessibleName(
+    `${avatarVisivel} ${nomeVisivel} ${papelVisivel}, menu de perfil`,
+  );
   await perfil.click();
   const menu = page.getByRole("menu", { name: "Opções da conta" });
   await expect(
@@ -232,6 +238,9 @@ test("editor de laboratório na demonstração carrega os períodos e bloqueia a
     has: page.getByText("Laboratório de Redes", { exact: true }),
   });
   await cadastro.getByRole("button", { name: "Editar cadastro" }).click();
+  await expect(
+    page.getByRole("region", { name: "Editor de cadastro" }),
+  ).toBeFocused();
   await expect(
     page.getByRole("heading", { name: "Editar laboratório", exact: true }),
   ).toBeVisible();
@@ -429,7 +438,7 @@ for (const rota of rotas) {
       `Overflow horizontal em ${rota}`,
     ).toBe(true);
     const resultado = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
       .analyze();
     if (resultado.violations.length)
       await test.info().attach("violacoes-axe", {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   Search,
   ArrowUpRight,
@@ -7,9 +8,14 @@ import {
   Clock3,
   ArrowRight,
 } from "lucide-react";
-import { getLaboratorios, getEquipamentos } from "@/lib/data";
+import { getCatalogoLaboratorios } from "@/lib/data";
 import { filtroCatalogoSchema } from "@/lib/schemas";
-import { PageHeading, LabIcon, EmptyState } from "@/components/shared";
+import {
+  PageHeading,
+  LabIcon,
+  EmptyState,
+  Pagination,
+} from "@/components/shared";
 import { nomeTipo, tiposLaboratorio } from "@/lib/types";
 import "./laboratorios.css";
 export default async function Laboratorios({
@@ -17,26 +23,19 @@ export default async function Laboratorios({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [params, labs, equipamentos] = await Promise.all([
-    searchParams,
-    getLaboratorios("ativos"),
-    getEquipamentos(),
-  ]);
+  const params = await searchParams;
   const filtros = filtroCatalogoSchema.safeParse(params);
   const f = filtros.success ? filtros.data : {};
-  const filtrados = labs.filter(
-    (l) =>
-      (!f.q ||
-        `${l.nome} ${l.descricao}`.toLowerCase().includes(f.q.toLowerCase())) &&
-      (!f.tipo || l.tipo === f.tipo) &&
-      (!f.capacidade || l.capacidade >= f.capacidade) &&
-      (!f.equipamento ||
-        equipamentos.some(
-          (e) =>
-            e.laboratorio_id === l.id &&
-            e.nome.toLowerCase().includes(f.equipamento!.toLowerCase()),
-        )),
-  );
+  const { pagina = 1, ...busca } = f;
+  const { laboratorios, total } = await getCatalogoLaboratorios({
+    ...busca,
+    pagina,
+  });
+  const query = new URLSearchParams();
+  for (const [chave, valor] of Object.entries(busca))
+    if (valor) query.set(chave, String(valor));
+  const base = query.size ? `/laboratorios?${query}` : "/laboratorios";
+  if (!laboratorios.length && pagina > 1) redirect(base);
   return (
     <>
       <PageHeading
@@ -117,8 +116,8 @@ export default async function Laboratorios({
       </form>
       <div className="catalog-caption">
         <span>
-          {filtrados.length} laboratório{filtrados.length !== 1 ? "s" : ""}{" "}
-          encontrado{filtrados.length !== 1 ? "s" : ""}
+          {total} laboratório{total !== 1 ? "s" : ""} encontrado
+          {total !== 1 ? "s" : ""}
         </span>
         {f.q || f.tipo || f.capacidade || f.equipamento ? (
           <Link href="/laboratorios">Limpar filtros</Link>
@@ -126,9 +125,9 @@ export default async function Laboratorios({
           <span>Um lugar para cada possibilidade.</span>
         )}
       </div>
-      {filtrados.length ? (
+      {laboratorios.length ? (
         <div className="catalog-grid">
-          {filtrados.map((l) => (
+          {laboratorios.map((l) => (
             <article className="panel catalog-card" key={l.id}>
               <div className={`catalog-visual catalog-visual-${l.tipo}`}>
                 <LabIcon tipo={l.tipo} size={42} />
@@ -154,12 +153,9 @@ export default async function Laboratorios({
                   </span>
                 </div>
                 <div className="catalog-tags">
-                  {equipamentos
-                    .filter((e) => e.laboratorio_id === l.id)
-                    .slice(0, 3)
-                    .map((e) => (
-                      <span key={e.id}>{e.nome}</span>
-                    ))}
+                  {l.equipamentos.map((e) => (
+                    <span key={e.id}>{e.nome}</span>
+                  ))}
                 </div>
                 <div className="catalog-card-footer">
                   <Link href={`/laboratorios/${l.id}`} className="section-link">
@@ -188,6 +184,7 @@ export default async function Laboratorios({
           />
         </div>
       )}
+      {total > 20 && <Pagination pagina={pagina} total={total} base={base} />}
     </>
   );
 }

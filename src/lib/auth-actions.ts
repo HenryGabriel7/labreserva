@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
+import { destinoPosLogin } from "@/lib/destino-login";
 import {
   definirSenhaSchema,
   loginSchema,
@@ -43,7 +44,8 @@ export async function loginAction(
   _estado: EstadoAuth,
   formData: FormData,
 ): Promise<EstadoAuth> {
-  const dados = loginSchema.safeParse(camposFormulario(formData));
+  const { destino, ...credenciais } = camposFormulario(formData);
+  const dados = loginSchema.safeParse(credenciais);
   if (!dados.success) return { error: mensagemLogin };
   try {
     const admin = createAdminClient();
@@ -107,7 +109,7 @@ export async function loginAction(
     return { error: mensagemLogin };
   }
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destinoPosLogin(destino));
 }
 
 export async function recuperarSenhaAction(

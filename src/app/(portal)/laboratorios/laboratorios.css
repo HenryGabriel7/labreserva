@@ -213,6 +213,10 @@
   gap: 25px;
   align-items: start;
 }
+.crud-editor {
+  min-width: 0;
+  scroll-margin-top: 90px;
+}
 .crud-list {
   padding: 7px 20px;
 }

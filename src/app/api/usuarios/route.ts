@@ -184,7 +184,13 @@ export async function POST(request: NextRequest) {
       await lerJsonLimitado(request),
     );
     if (!dados.success)
-      return resposta({ error: "Confira os dados do convite." }, 400);
+      return resposta(
+        {
+          error:
+            "Confira os dados do convite e informe exatamente um papel de acesso por conta.",
+        },
+        400,
+      );
     csv = "csv" in dados.data;
     usuarios =
       "csv" in dados.data ? lerCsvUsuarios(dados.data.csv) : [dados.data];
