@@ -6,6 +6,7 @@ import {
   diasCalendario,
   intervalosNoDia,
   moverPeriodoCalendario,
+  somarDias,
 } from "@/lib/reservas";
 import type { Laboratorio } from "@/lib/types";
 export type Ocupado = {
@@ -33,7 +34,7 @@ export function Calendario({
     `/calendario?lab=${lab}&data=${d}&visao=${v}`;
   const horaLocal = (d: string, h: number) =>
     fromZonedTime(
-      `${d}T${String(h).padStart(2, "0")}:00:00`,
+      `${h === 24 ? somarDias(d, 1) : d}T${String(h % 24).padStart(2, "0")}:00:00`,
       "America/Sao_Paulo",
     ).getTime();
   const ocupacao = (d: string, h: number) =>
@@ -196,7 +197,7 @@ export function Calendario({
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: 14 }, (_, i) => i + 8).map((h) => (
+              {Array.from({ length: 24 }, (_, h) => h).map((h) => (
                 <tr key={h}>
                   <th>{String(h).padStart(2, "0")}:00</th>
                   {dias.map((d) => {
@@ -216,13 +217,13 @@ export function Calendario({
                             </strong>
                             <span>
                               {String(h).padStart(2, "0")}:00 –{" "}
-                              {String(h + 1).padStart(2, "0")}:00
+                              {String((h + 1) % 24).padStart(2, "0")}:00
                             </span>
                           </div>
                         ) : (
                           <Link
                             className="calendar-free"
-                            href={`/reservas/nova?lab=${lab}&data=${d}&inicio=${String(h).padStart(2, "0")}:00&fim=${String(h + 1).padStart(2, "0")}:00`}
+                            href={`/reservas/nova?lab=${lab}&data=${d}&inicio=${String(h).padStart(2, "0")}:00${h < 23 ? `&fim=${String(h + 1).padStart(2, "0")}:00` : ""}`}
                             aria-label={`Solicitar ${d} às ${h} horas`}
                           >
                             <Plus size={13} />

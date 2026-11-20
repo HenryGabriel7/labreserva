@@ -26,6 +26,151 @@ test.describe("calendário e catálogo com Supabase local", () => {
     await expect(page).toHaveURL(/3100\/$/);
   });
 
+  test("dia e semana mostram horários extremos e bloqueios até a meia-noite exclusiva", async ({
+    page,
+  }) => {
+    const db = clienteServico();
+    const lab = await criarLaboratorio(db);
+    const reservas = [randomUUID(), randomUUID()];
+    const bloqueios = [randomUUID(), randomUUID()];
+    try {
+      exigirSucesso(
+        await db
+          .from("janelas_horario")
+          .update({ inicio: "07:00", fim: "23:00" })
+          .eq("laboratorio_id", lab.id),
+        "Configurar funcionamento estendido da fixture local",
+      );
+      const base = {
+        laboratorio_id: lab.id,
+        solicitante_id: aluno.id,
+        escopo: "laboratorio",
+        n_participantes: 3,
+        prioridade_efetiva: 1,
+        papel_solicitante: "aluno",
+        status: "aprovada",
+        finalidade: "Atividade fictícia no horário estendido",
+      };
+      exigirSucesso(
+        await db.from("reservas").insert([
+          {
+            ...base,
+            id: reservas[0],
+            inicio: "2028-02-02T07:00:00-03:00",
+            fim: "2028-02-02T08:00:00-03:00",
+          },
+          {
+            ...base,
+            id: reservas[1],
+            inicio: "2028-02-02T22:00:00-03:00",
+            fim: "2028-02-02T23:00:00-03:00",
+          },
+        ]),
+        "Criar reservas fictícias antes das oito e após as vinte e duas",
+      );
+      exigirSucesso(
+        await db.from("bloqueios").insert([
+          {
+            id: bloqueios[0],
+            laboratorio_id: lab.id,
+            inicio: "2028-02-02T23:00:00-03:00",
+            fim: "2028-02-03T00:00:00-03:00",
+            motivo: "manutencao",
+            descricao: "Bloqueio fictício com término à meia-noite",
+          },
+          {
+            id: bloqueios[1],
+            laboratorio_id: lab.id,
+            inicio: "2028-02-03T23:30:00-03:00",
+            fim: "2028-02-04T00:30:00-03:00",
+            motivo: "manutencao",
+            descricao: "Bloqueio fictício que atravessa a meia-noite",
+          },
+        ]),
+        "Criar bloqueios fictícios nos limites do dia local",
+      );
+      const celula = (hora: string, coluna = 0) =>
+        page
+          .locator(".calendar-table tbody tr")
+          .filter({
+            has: page
+              .locator("th")
+              .filter({ hasText: new RegExp(`^${hora}$`) }),
+          })
+          .locator("td")
+          .nth(coluna);
+      for (const visao of ["dia", "semana"]) {
+        await page.goto(
+          `/calendario?lab=${lab.id}&data=2028-02-02&visao=${visao}`,
+        );
+        await expect(page.locator(".calendar-table tbody tr")).toHaveCount(24);
+        const coluna = visao === "dia" ? 0 : 2; // 02/02/2028 é quarta-feira.
+        for (const hora of ["07:00", "22:00"]) {
+          await expect(celula(hora, coluna)).toContainText(
+            "Laboratório reservado",
+          );
+        }
+        await expect(
+          celula("08:00", coluna).locator(".calendar-block"),
+        ).toHaveCount(0);
+        await expect(celula("23:00", coluna)).toContainText("Bloqueado");
+        await expect(celula("23:00", coluna)).toContainText("23:00 – 00:00");
+        if (visao === "semana") {
+          await expect(
+            celula("00:00", 3).locator(".calendar-block"),
+          ).toHaveCount(0);
+          await expect(celula("23:00", 3)).toContainText("Bloqueado");
+          await expect(celula("00:00", 4)).toContainText("Bloqueado");
+          await expect(
+            celula("01:00", 4).locator(".calendar-block"),
+          ).toHaveCount(0);
+        }
+      }
+      await page.goto(`/calendario?lab=${lab.id}&data=2028-02-03&visao=dia`);
+      await expect(celula("00:00").locator(".calendar-block")).toHaveCount(0);
+      await expect(celula("23:00")).toContainText("Bloqueado");
+      await page.goto(`/calendario?lab=${lab.id}&data=2028-02-04&visao=dia`);
+      await expect(celula("00:00")).toContainText("Bloqueado");
+      await expect(celula("01:00").locator(".calendar-block")).toHaveCount(0);
+      const solicitarTarde = celula("23:00").getByRole("link");
+      const destino = new URL(
+        (await solicitarTarde.getAttribute("href"))!,
+        page.url(),
+      );
+      expect(destino.searchParams.get("lab")).toBe(lab.id);
+      expect(destino.searchParams.get("data")).toBe("2028-02-04");
+      expect(destino.searchParams.get("inicio")).toBe("23:00");
+      expect(destino.searchParams.has("fim")).toBe(false);
+      await solicitarTarde.click();
+      await expect(
+        page.getByRole("combobox", { name: "Laboratório", exact: true }),
+      ).toHaveValue(lab.id);
+      await expect(page.getByLabel("Data", { exact: true })).toHaveValue(
+        "2028-02-04",
+      );
+      await expect(
+        page.getByLabel("Horário de início", { exact: true }),
+      ).toHaveValue("23:00");
+    } finally {
+      exigirSucesso(
+        await db.from("reservas").delete().in("id", reservas),
+        "Remover reservas da fixture",
+      );
+      exigirSucesso(
+        await db.from("bloqueios").delete().in("id", bloqueios),
+        "Remover bloqueios da fixture",
+      );
+      exigirSucesso(
+        await db.from("janelas_horario").delete().eq("laboratorio_id", lab.id),
+        "Remover horários da fixture",
+      );
+      exigirSucesso(
+        await db.from("laboratorios").delete().eq("id", lab.id),
+        "Remover laboratório da fixture",
+      );
+    }
+  });
+
   test("mês civil inclui bloqueios que cruzam dias e respeita meia-noite local", async ({
     page,
   }) => {
